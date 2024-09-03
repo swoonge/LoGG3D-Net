@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 from pipelines.PointNetVLAD import *
 from pipelines.LOGG3D import *
+from modules.overlap_transformer import *
 
 
 def get_pipeline(pipeline_name):
@@ -11,6 +12,8 @@ def get_pipeline(pipeline_name):
     elif pipeline_name == 'PointNetVLAD':
         pipeline = PointNetVLAD(global_feat=True, feature_transform=True,
                                 max_pool=False, output_dim=256, num_points=4096)
+    elif pipeline_name == 'OverlapTransformer':
+        pipeline = OverlapTransformer(channels=1, use_transformer=True)
     return pipeline
 
 
