@@ -67,7 +67,7 @@ data_arg.add_argument("--gp_rem", type=str2bool,
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
-data_arg.add_argument('--kitti_dir', type=str, default='/mnt/088A6CBB8A6CA742/Datasets/Kitti/dataset/',
+data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/Data0/DataSets/kitti/dataset/',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_3m_json', type=str,
                       default='positive_sequence_D-3_T-0.json')
@@ -77,13 +77,13 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [0, 1, 2, 3, 4, 5, 6, 7, 9, 10],
-    'val': [],
-    'test': [8]
+    'train': [3, 4, 5, 6, 7, 8, 9],
+    'val': [2],
+    'test': [0]
 })
 
 data_arg.add_argument('--mulran_dir', type=str,
-                      default='/mnt/088A6CBB8A6CA742/Datasets/MulRan/', help="Path to the MulRan dataset")
+                      default='/media/vision/Data0/DataSets/MulRan/', help="Path to the MulRan dataset")
 data_arg.add_argument("--mulran_normalize_intensity", type=str2bool,
                       default=False, help="Normalize intensity return.")
 data_arg.add_argument('--mulran_3m_json', type=str,
