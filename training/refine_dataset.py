@@ -1,10 +1,7 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import sys
 import torch
 import logging
-from datetime import datetime
-from torch.utils.tensorboard import SummaryWriter
 from torchpack import distributed as dist
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from utils.misc_utils import log_config
@@ -13,136 +10,107 @@ from utils.data_loaders.make_dataloader import *
 from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
+import open3d as o3d
+from torchsparse import PointTensor, SparseTensor
+import matplotlib.pyplot as plt
 
-# from models.backbones.spvnas.core.modules import dist
 cfg = get_config()
 
-ch = logging.StreamHandler(sys.stdout)
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format='%(asctime)s %(message)s',
-                    datefmt='%m/%d %H:%M:%S',
-                    handlers=[ch])
-logging.basicConfig(level=logging.INFO, format="")
+visualize = False
 
+def visualize_pointclouds(pointclouds):
+    """
+    6개의 포인트 클라우드를 받아서 6분할된 하나의 창에 시각화
+    pointclouds: list of numpy arrays, each of shape (N, 4) where N is the number of points and 4 corresponds to (x, y, z, intensity)
+    """
+    fig = plt.figure(figsize=(12, 8))  # 큰 창 크기 설정
+
+    # 각 포인트 클라우드를 반복하면서 subplot에 그리기
+    for i, data in enumerate(pointclouds):
+        # 좌표와 강도값 추출
+        coords = data[:, :3]  # (x, y, z) 좌표
+        intensity = data[:, 3]  # 강도
+
+        # Open3D의 PointCloud 객체 생성
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(coords)
+
+        # 강도를 색상으로 변환 (0 ~ 1로 정규화 후 grayscale로 적용)
+        colors = np.clip(colors, 0, 1)  # 0 ~ 1 사이로 클리핑
+        colors = np.stack([colors, colors, colors], axis=1)  # RGB 동일한 값으로 설정
+
+        # PointCloud 객체에 색상 설정
+        point_cloud.colors = o3d.utility.Vector3dVector(colors.astype(np.float32))
+
+        # Subplot으로 시각화
+        ax = fig.add_subplot(2, 3, i + 1)  # 2행 3열 구조에서 i+1번째 위치에 표시
+        vis = o3d.visualization.Visualizer()  # Open3D 시각화 객체 생성
+        vis.create_window(window_name=f'PointCloud {i+1}', width=400, height=300, visible=False)
+        vis.add_geometry(point_cloud)
+        vis.update_geometry(point_cloud)
+        vis.poll_events()
+        vis.update_renderer()
+
+        # 렌더된 이미지 캡처 후 닫기
+        img = vis.capture_screen_float_buffer(do_render=True)
+        vis.destroy_window()
+        ax.imshow(np.asarray(img))
+        ax.axis('off')  # 축 제거
+        ax.set_title(f'PointCloud {i+1}')
+
+    plt.tight_layout()
+    plt.show()
 
 def main():
-    dist.init()
-    torch.backends.cudnn.benchmark = True
-    torch.cuda.set_device(dist.local_rank())
-
-    if (dist.rank() % dist.size() == 0):
-        writer = SummaryWriter(comment=f"_{cfg.job_id}")
-
-        logger = logging.getLogger()
-        logging.info('\n' + ' '.join([sys.executable] + sys.argv))
-        logging.info('Slurm Job ID: ' + cfg.job_id)
-        logging.info('Training pipeline: ' + cfg.train_pipeline)
-        log_config(cfg, logging)
-        cfg.experiment_name = f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}_{cfg.experiment_name}_{cfg.job_id}"
-        logging.info("Experiment Name: " + cfg.experiment_name)
-
-        logging.info('dist size: ' + str(dist.size()))
-        logging.info('dist rank: ' + str(dist.rank()))
-
-    # Get model
-    model = get_pipeline(cfg.train_pipeline)
-    n_params = sum([param.nelement() for param in model.parameters()])
-    logging.info('Number of model parameters: {}'.format(n_params))
-
-    # Get train utils
-    # parameters = filter(lambda p: p.requires_grad, model.parameters())
-    loss_function = train_utils.get_loss_function(cfg)
-    point_loss_function = train_utils.get_point_loss_function(cfg)
-    optimizer = train_utils.get_optimizer(cfg, model.parameters())
-    scheduler = train_utils.get_scheduler(cfg, optimizer)
-
-    if cfg.resume_training:
-        resume_filename = cfg.resume_checkpoint
-        save_path = os.path.join(os.path.dirname(
-            __file__), 'checkpoints', resume_filename)
-        print("Resuming Model From ", save_path)
-        checkpoint = torch.load(save_path)
-        starting_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    else:
-        starting_epoch = 0
-
-    model = torch.nn.parallel.DistributedDataParallel(
-        model.to('cuda:%d' % dist.local_rank()),
-        device_ids=[dist.local_rank()],
-        find_unused_parameters=True)
-
     # Get data loader
     train_loader = make_data_loader(cfg,
                                     cfg.train_phase,
                                     cfg.batch_size,
                                     num_workers=cfg.train_num_workers,
-                                    shuffle=True,
-                                    dist=[dist.size(), dist.rank()])
+                                    shuffle=False)
+    
+    for i, batch in enumerate(train_loader, 0):
+        data = batch[0] # SparseTensor 타입 
+        info = batch[1] # keys -> drive, query_id, pos_pairs
 
-    for epoch in range(starting_epoch, cfg.max_epoch):
-        if (dist.rank() % dist.size() == 0):
-            lr = scheduler.get_last_lr()
-            logging.info('\n' + '**** EPOCH %03d ****' %
-                         (epoch) + ' LR: %03f' % (lr[0]))
-        running_loss = 0.0
-        running_scene_loss = 0.0
-        running_point_loss = 0.0
-        model.train()
+        print("----------info----------")
+        print("drive: ", info['drive'])
+        print("query_id: ", info['query_id'])
+        print("pos_pairs num: ", info['pos_pairs'].shape)
 
-        for i, batch in enumerate(train_loader, 0):
-            if cfg.train_pipeline == 'LOGG3D':
-                batch_st = batch[0].to('cuda:%d' % dist.local_rank())
-                if not batch[1]['pos_pairs'].ndim == 2:
-                    continue
-                output = model(batch_st)
-                scene_loss = loss_function(output[0], cfg)
-                running_scene_loss += scene_loss.item()
-                if cfg.point_loss_weight > 0:
-                    point_loss = point_loss_function(
-                        output[1][0], output[1][1], batch[1]['pos_pairs'], cfg)
-                    running_point_loss += point_loss.item()
-                    loss = cfg.scene_loss_weight * scene_loss + cfg.point_loss_weight * point_loss
-                else:
-                    loss = scene_loss
+        print("----------data----------")
+        # LoGG3D 네트워크의 입련은 SparseTensor 타입이고, spvcnn으로 특징을 추출한다. spvcnn의 출려는 torch.Tensor 타입이다.
+        # data는 x, y, z, count로 구성된 SparseTensor 타입이다. count는 0, 1, 2, 3, 4, 5이며 포인트 클라우드의 종류를 구분한다.
+        _, counts = torch.unique(data.C[:, -1], return_counts=True) # 따라서 unique를 통해 counts를 구분해 두고,
+        pcs = torch.split(data.C, list(counts)) # spvcnn의 출력은 각 포인트의 피처인데, 이를 각 포인트 클라우드별로 나누기 위해 counts를 사용한다.
+        print("counts: ", counts)
+        # 특징 텐서의 모양 출력
+        print("Features Shape:", data.F.shape)
+        # 좌표 텐서의 모양 출력
+        print("Coordinates Shape:", data.C.shape)
 
-            elif cfg.train_pipeline == 'PointNetVLAD':
-                batch_t = batch.to('cuda:%d' % dist.local_rank())
-                output = model(batch_t.unsqueeze(1))
-                scene_loss = loss_function(output, cfg)
-                running_scene_loss += scene_loss.item()
-                loss = scene_loss
+        pcs_list = []
+        for pc in pcs:
+            pcs_list.append(pc.numpy())
+        
+        visualize_pointclouds(pcs_list)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        if i == 0:
+            break
+        # if cfg.train_pipeline == 'LOGG3D':
+        #     batch_st = batch[0].to('cuda:%d' % dist.local_rank())
+        #     if not batch[1]['pos_pairs'].ndim == 2:
+        #         continue
+        #     output = model(batch_st)
+        #     scene_loss = loss_function(output[0], cfg)
+        #     running_scene_loss += scene_loss.item()
+        #     if cfg.point_loss_weight > 0:
+        #         point_loss = point_loss_function(
+        #             output[1][0], output[1][1], batch[1]['pos_pairs'], cfg)
+        #         running_point_loss += point_loss.item()
+        #         loss = cfg.scene_loss_weight * scene_loss + cfg.point_loss_weight * point_loss
+        #     else:
+        #         loss = scene_loss
 
-            running_loss += loss.item()
-            if (i % cfg.loss_log_step) == (cfg.loss_log_step - 1):
-                avg_loss = running_loss / cfg.loss_log_step
-                avg_scene_loss = running_scene_loss / cfg.loss_log_step
-                avg_point_loss = running_point_loss / cfg.loss_log_step
-
-                if (dist.rank() % dist.size() == 0):
-                    lr = scheduler.get_last_lr()
-                    logging.info('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr[0]) + 
-                                 'avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
-                    writer.add_scalar('training loss',
-                                      avg_loss,
-                                      epoch * len(train_loader) + i)
-                    writer.add_scalar('training point loss',
-                                      avg_point_loss,
-                                      epoch * len(train_loader) + i)
-                    writer.add_scalar('training scene loss',
-                                      avg_scene_loss,
-                                      epoch * len(train_loader) + i)
-                running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
-
-        scheduler.step()
-
-    logging.info("Finished training.")
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

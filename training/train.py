@@ -114,6 +114,11 @@ def main():
                 running_scene_loss += scene_loss.item()
                 loss = scene_loss
 
+            elif cfg.train_pipeline == 'OverlapTransformer':
+                batch_st = batch[0].to('cuda:%d' % dist.local_rank())
+                if not batch[1]['pos_pairs'].ndim == 2:
+                    continue
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

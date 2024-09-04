@@ -67,8 +67,6 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
         use_random_occlusion = config.eval_random_occlusion
         Dataset = dataset_str_mapping[config.eval_dataset]
 
-    print("[]", Dataset)
-
     dset = Dataset(phase,
                    random_scale=use_random_scale,
                    random_rotation=use_random_rotation,
