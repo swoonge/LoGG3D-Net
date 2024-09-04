@@ -13,6 +13,7 @@ from utils.data_loaders.make_dataloader import *
 from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
+from utils.data_utils.range_projection import range_projection
 
 # from models.backbones.spvnas.core.modules import dist
 cfg = get_config()
@@ -115,9 +116,24 @@ def main():
                 loss = scene_loss
 
             elif cfg.train_pipeline == 'OverlapTransformer':
-                batch_st = batch[0].to('cuda:%d' % dist.local_rank())
+                batch_st = batch[0]
                 if not batch[1]['pos_pairs'].ndim == 2:
                     continue
+                sample_batch = []
+                _, counts = torch.unique(batch_st.C[:, -1], return_counts=True) # 따라서 unique를 통해 counts를 구분해 두고,
+                pcs = torch.split(batch_st.C, list(counts)) # spvcnn의 출력은 각 포인트의 피처인데, 이를 각 포인트 클라우드별로 나누기 위해 counts를 사용한다.
+                for pc in pcs: 
+                    depth_data, _, _, _ = range_projection(pc.numpy())
+                    sample_batch.append(torch.from_numpy(depth_data))
+                current_batch = torch.stack(sample_batch).type(torch.FloatTensor).to('cuda:%d' % dist.local_rank())
+                current_batch = torch.unsqueeze(current_batch, dim=1) # [1,6,64,900]
+
+                output = model(current_batch)
+            
+                ## loss
+                scene_loss = loss_function(output, cfg)
+                running_scene_loss += scene_loss.item() 
+                loss = scene_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -150,7 +166,7 @@ def main():
             save_path = os.path.join(os.path.dirname(__file__), 'checkpoints')
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
-            save_path = str(save_path) + '/' + cfg.experiment_name
+            save_path = str(save_path) + '/' + cfg.experiment_name + "_" + str(epoch) + ".pth"
             logging.info("Saving to: " + str(save_path))
             if isinstance(model, torch.nn.DataParallel):
                 model_to_save = model.module
