@@ -18,7 +18,7 @@ def str2bool(v):
 trainer_arg = add_argument_group('Train')
 trainer_arg.add_argument('--train_pipeline', type=str, default='LOGG3D')
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
-trainer_arg.add_argument('--resume_checkpoint', type=str, default='')
+trainer_arg.add_argument('--resume_checkpoint', type=str, default='2024-09-03_18-32-21_LOGG3D_Default_0')
 
 # Batch setting
 trainer_arg.add_argument('--batch_size', type=int, default=1) # Batch size is limited to 1.
