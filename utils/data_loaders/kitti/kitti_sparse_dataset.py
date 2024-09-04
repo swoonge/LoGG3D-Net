@@ -289,3 +289,4 @@ class KittiPointSparseTupleDataset(KittiSparseTupleDataset):
                 'other_neg': other_neg_st,
                 'meta_info': meta_info,
             }
+

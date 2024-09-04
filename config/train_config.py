@@ -122,7 +122,8 @@ data_arg.add_argument('--max_scale', type=float, default=1.2)
 
 # Misc
 misc_arg = add_argument_group('Misc')
-misc_arg.add_argument('--experiment_name', type=str, default='run')
+misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default')
+# misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_Default')
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)

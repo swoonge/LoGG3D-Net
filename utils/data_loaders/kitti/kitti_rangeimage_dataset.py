@@ -56,10 +56,6 @@ class KittiDataset(PointCloudDataset):
     def get_velodyne_fn(self, drive, t):
         fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
         return fname
-    
-    def get_rangeimage_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/depth_map/%06d.png' % (drive, t)
-        return fname
 
     def get_pointcloud_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, pc_id)
@@ -84,9 +80,6 @@ class KittiDataset(PointCloudDataset):
             xyzr = scale * xyzr
 
         return xyzr
-
-    def get_rangeimage_tensor(self, drive_id, pc_id):
-        pass
 
     def __getitem__(self, idx):
         drive_id = self.files[idx][0]

@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import sys
 import torch
 import logging
@@ -125,10 +126,8 @@ def main():
 
                 if (dist.rank() % dist.size() == 0):
                     lr = scheduler.get_last_lr()
-                    logging.info('avg running loss: ' +
-                                 str(avg_loss) + ' LR: %03f' % (lr[0]))
-                    logging.info('avg_scene_loss: ' + str(avg_scene_loss) +
-                                 ' avg_point_loss: ' + str(avg_point_loss))
+                    logging.info('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr[0]) + 
+                                 'avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
                     writer.add_scalar('training loss',
                                       avg_loss,
                                       epoch * len(train_loader) + i)
