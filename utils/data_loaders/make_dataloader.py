@@ -7,10 +7,11 @@ from utils.data_loaders.mulran.mulran_sparse_dataset import *
 from utils.data_loaders.mulran.mulran_dataset import *
 from utils.data_loaders.kitti.kitti_sparse_dataset import *
 from utils.data_loaders.kitti.kitti_dataset import *
+from utils.data_loaders.kitti.kitti_rangeimage_dataset import *
 
 
 ALL_DATASETS = [
-    KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset,
+    KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
     MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset
 ]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}

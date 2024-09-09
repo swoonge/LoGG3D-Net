@@ -5,6 +5,7 @@ import random
 import numpy as np
 import logging
 import json
+from utils.data_utils.range_projection import range_projection
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from utils.misc_utils import Timer
@@ -86,7 +87,10 @@ class KittiDataset(PointCloudDataset):
         return xyzr
 
     def get_rangeimage_tensor(self, drive_id, pc_id):
-        pass
+        fname = self.get_velodyne_fn(drive_id, pc_id)
+        xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
+        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
+        return range_image
 
     def __getitem__(self, idx):
         drive_id = self.files[idx][0]

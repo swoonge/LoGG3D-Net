@@ -3,6 +3,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import sys
 import torch
 import logging
+from tqdm import tqdm
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 from torchpack import distributed as dist
@@ -14,6 +15,7 @@ from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
 from utils.data_utils.range_projection import range_projection
+import matplotlib.pyplot as plt
 
 # from models.backbones.spvnas.core.modules import dist
 cfg = get_config()
@@ -39,7 +41,7 @@ def main():
         logging.info('Slurm Job ID: ' + cfg.job_id)
         logging.info('Training pipeline: ' + cfg.train_pipeline)
         log_config(cfg, logging)
-        cfg.experiment_name = f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}_{cfg.experiment_name}_{cfg.job_id}"
+        cfg.experiment_name = f"{cfg.experiment_name}/{datetime.now(tz=None).strftime('%y-%m-%d_%H-%M-%S')}_{cfg.job_id}"
         logging.info("Experiment Name: " + cfg.experiment_name)
 
         logging.info('dist size: ' + str(dist.size()))
@@ -81,6 +83,13 @@ def main():
                                     num_workers=cfg.train_num_workers,
                                     shuffle=True,
                                     dist=[dist.size(), dist.rank()])
+    
+    val_loader = make_data_loader(cfg,
+                                    cfg.val_phase,
+                                    cfg.batch_size,
+                                    num_workers=cfg.train_num_workers,
+                                    shuffle=False,
+                                    dist=[dist.size(), dist.rank()])
 
     for epoch in range(starting_epoch, cfg.max_epoch):
         if (dist.rank() % dist.size() == 0):
@@ -90,9 +99,18 @@ def main():
         running_loss = 0.0
         running_scene_loss = 0.0
         running_point_loss = 0.0
+        val_loss = 0.0
+        val_scene_loss = 0.0
+        val_point_loss = 0.0
+
         model.train()
 
-        for i, batch in enumerate(train_loader, 0):
+        train_loader_progress_bar = tqdm(train_loader, desc="Training", leave=True)
+
+        vis_list = [[],[]]
+
+        for i, batch in enumerate(train_loader_progress_bar, 0):
+            
             if cfg.train_pipeline == 'LOGG3D':
                 batch_st = batch[0].to('cuda:%d' % dist.local_rank())
                 if not batch[1]['pos_pairs'].ndim == 2:
@@ -116,24 +134,24 @@ def main():
                 loss = scene_loss
 
             elif cfg.train_pipeline == 'OverlapTransformer':
-                batch_st = batch[0]
-                if not batch[1]['pos_pairs'].ndim == 2:
+                vis_imgs = []
+                batch_t = batch.to('cuda:%d' % dist.local_rank())
+                if not batch_t.shape[0] == 6:
+                    print("Batch size is not 6")
                     continue
-                sample_batch = []
-                _, counts = torch.unique(batch_st.C[:, -1], return_counts=True) # 따라서 unique를 통해 counts를 구분해 두고,
-                pcs = torch.split(batch_st.C, list(counts)) # spvcnn의 출력은 각 포인트의 피처인데, 이를 각 포인트 클라우드별로 나누기 위해 counts를 사용한다.
-                for pc in pcs: 
-                    depth_data, _, _, _ = range_projection(pc.numpy())
-                    sample_batch.append(torch.from_numpy(depth_data))
-                current_batch = torch.stack(sample_batch).type(torch.FloatTensor).to('cuda:%d' % dist.local_rank())
-                current_batch = torch.unsqueeze(current_batch, dim=1) # [1,6,64,900]
-
+                
+                current_batch = torch.unsqueeze(batch_t, dim=1).type(torch.FloatTensor).to('cuda:%d' % dist.local_rank()) # [6,1,64,900]
                 output = model(current_batch)
-            
+
                 ## loss
                 scene_loss = loss_function(output, cfg)
                 running_scene_loss += scene_loss.item() 
                 loss = scene_loss
+
+                # for i in range(6):
+                #     vis_imgs.append(current_batch[i].cpu().numpy())
+                # vis_list[0] = vis_imgs.copy()
+                # vis_list[1] = output.detach().cpu().numpy()
 
             optimizer.zero_grad()
             loss.backward()
@@ -147,40 +165,103 @@ def main():
 
                 if (dist.rank() % dist.size() == 0):
                     lr = scheduler.get_last_lr()
-                    logging.info('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr[0]) + 
-                                 'avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
-                    writer.add_scalar('training loss',
-                                      avg_loss,
-                                      epoch * len(train_loader) + i)
-                    writer.add_scalar('training point loss',
-                                      avg_point_loss,
-                                      epoch * len(train_loader) + i)
-                    writer.add_scalar('training scene loss',
-                                      avg_scene_loss,
-                                      epoch * len(train_loader) + i)
+                    tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr[0]) + 
+                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
+                    writer.add_scalar('training loss', avg_loss, epoch * len(train_loader) + i)
+                    writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
+                    writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
+
+                # # 시각화
+                # plt.figure(figsize=(12, 12))
+                # # 각 이미지를 하나의 창에서 행으로 시각화
+                # for i, img in enumerate(vis_list[0]):
+                #     plt.subplot(7, 1, i + 1)  # 6행 1열로 나눈 서브플롯의 i+1번째에 이미지 추가
+                #     plt.imshow(img[0], cmap='gray')  # 이미지를 grayscale로 표시
+                #     plt.axis('off')  # 축 제거
+                #     plt.title(f"Image {i + 1}")
+
+                # plt.subplot(7, 1, 7)
+                # plt.plot(vis_list[1][0].numpy(), label='q_vec', marker='o', linestyle='-', markersize=4, color='Green')
+                # plt.plot(vis_list[1][1].numpy(), label='pos_vecs', marker='x', linestyle='-', markersize=4, color='Blue')
+                # plt.plot(vis_list[1][3].numpy(), label='pos_vecs', marker='x', linestyle='-', markersize=4, color='Red')
+                # plt.plot(vis_list[1][5].numpy(), label='on_vecs', marker='x', linestyle='-', markersize=4, color='Black')
+                # plt.title('Visualization of q_vec and pos_vecs')
+                # plt.xlabel('Index')
+                # plt.ylabel('Value')
+                # plt.grid(True)
+
+                # plt.tight_layout()
+                # plt.show()
 
         scheduler.step()
 
-        if cfg.save_model_after_epoch and (dist.rank() % dist.size() == 0):
-            save_path = os.path.join(os.path.dirname(__file__), 'checkpoints')
-            if not os.path.exists(save_path):
-                os.makedirs(save_path)
-            save_path = str(save_path) + '/' + cfg.experiment_name + "_" + str(epoch) + ".pth"
-            logging.info("Saving to: " + str(save_path))
-            if isinstance(model, torch.nn.DataParallel):
-                model_to_save = model.module
-            elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
-                model_to_save = model.module
-            else:
-                model_to_save = model
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model_to_save.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss
-            },
-                save_path)
+        print("Validation")
+        model.eval()
+        if (dist.rank() % dist.size() == 0):
+            with torch.no_grad():
+                
+                for i, batch in enumerate(val_loader):
+                    if cfg.train_pipeline == 'LOGG3D':
+                        batch_st = batch[0].to('cuda:%d' % dist.local_rank())
+                        if not batch[1]['pos_pairs'].ndim == 2:
+                            continue
+                        output = model(batch_st)
+                        scene_loss = loss_function(output[0], cfg)
+                        val_scene_loss += scene_loss.item()
+                        if cfg.point_loss_weight > 0:
+                            point_loss = point_loss_function(
+                                output[1][0], output[1][1], batch[1]['pos_pairs'], cfg)
+                            val_point_loss += point_loss.item()
+                            loss = cfg.scene_loss_weight * scene_loss + cfg.point_loss_weight * point_loss
+                        else:
+                            loss = scene_loss
+
+                    elif cfg.train_pipeline == 'PointNetVLAD':
+                        batch_t = batch.to('cuda:%d' % dist.local_rank())
+                        output = model(batch_t.unsqueeze(1))
+                        scene_loss = loss_function(output, cfg)
+                        val_scene_loss += scene_loss.item()
+                        loss = scene_loss
+
+                    elif cfg.train_pipeline == 'OverlapTransformer':
+                        batch_t = batch.to('cuda:%d' % dist.local_rank())
+                        if not batch_t.shape[0] == 6:
+                            print("Batch size is not 6")
+                            continue
+                        current_batch = torch.unsqueeze(batch_t, dim=1).type(torch.FloatTensor).to('cuda:%d' % dist.local_rank())
+                        output = model(current_batch)
+                        scene_loss = loss_function(output, cfg)
+                        val_scene_loss += scene_loss.item()
+                        loss = scene_loss
+                    val_loss += loss.item()
+            
+        # if cfg.save_model_after_epoch and (dist.rank() % dist.size() == 0):
+        save_path = os.path.join(os.path.join(os.path.dirname(__file__), 'checkpoints'), cfg.experiment_name)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_path = str(save_path) + '/' + "epoch_" + str(epoch) + ".pth"
+        logging.info("Saving to: " + str(save_path))
+        if isinstance(model, torch.nn.DataParallel):
+            model_to_save = model.module
+        elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
+            model_to_save = model.module
+        else:
+            model_to_save = model
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model_to_save.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss
+        },
+            save_path)
+        
+        lr = scheduler.get_last_lr()
+        print('val loss: ' + str(avg_loss)[:7] + ' val_scene_loss: ' + str(avg_scene_loss)[:7] + ' val_point_loss: ' + str(avg_point_loss)[:7])
+        writer.add_scalar('lr', lr, epoch)
+        writer.add_scalar('val loss', val_loss / len(val_loader), epoch)
+        writer.add_scalar('val point loss', val_point_loss / len(val_loader), epoch)
+        writer.add_scalar('val scene loss', val_scene_loss / len(val_loader), epoch)
 
     logging.info("Finished training.")
 

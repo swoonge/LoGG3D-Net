@@ -5,13 +5,14 @@ import random
 import numpy as np
 import logging
 import json
+from utils.data_utils.range_projection import range_projection
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from utils.misc_utils import Timer
 from utils.o3d_tools import *
 from utils.data_loaders.pointcloud_dataset import *
 
-class KittiDataset(PointCloudDataset):
+class KittiRangeImageDataset(PointCloudDataset):
     r"""
     Generate single pointcloud frame from KITTI odometry dataset. 
     """
@@ -56,6 +57,10 @@ class KittiDataset(PointCloudDataset):
     def get_velodyne_fn(self, drive, t):
         fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
         return fname
+    
+    def get_rangeimage_fn(self, drive, t):
+        fname = self.root + '/sequences/%02d/depth_map/%06d.png' % (drive, t)
+        return fname
 
     def get_pointcloud_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, pc_id)
@@ -81,18 +86,24 @@ class KittiDataset(PointCloudDataset):
 
         return xyzr
 
+    def get_rangeimage_tensor(self, drive_id, pc_id):
+        fname = self.get_velodyne_fn(drive_id, pc_id)
+        xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
+        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
+        return range_image
+
     def __getitem__(self, idx):
         drive_id = self.files[idx][0]
         t0 = self.files[idx][1]
 
-        xyz0_th = self.get_pointcloud_tensor(drive_id, t0)
+        range_img = self.get_rangeimage_tensor(drive_id, t0)
         meta_info = {'drive': drive_id, 't0': t0}
 
-        return (xyz0_th,
+        return (range_img,
                 meta_info)
 
 
-class KittiTupleDataset(KittiDataset):
+class KittiRangeImageTupleDataset(KittiRangeImageDataset):
     r"""
     Generate tuples (anchor, positives, negatives) using distance
     Optional other_neg for quadruplet loss. 
@@ -181,17 +192,22 @@ class KittiTupleDataset(KittiDataset):
         drive_id, query_id = self.files[idx][0], self.files[idx][1]
         positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
 
+        if len(positive_ids) < self.positives_per_query:
+            positive_ids = positive_ids + positive_ids
+        if len(negative_ids) < self.negatives_per_query:
+            negative_ids = negative_ids + negative_ids
+
         sel_positive_ids = random.sample(
             positive_ids, self.positives_per_query)
         sel_negative_ids = random.sample(
             negative_ids, self.negatives_per_query)
         positives, negatives, other_neg = [], [], None
 
-        query_th = self.get_pointcloud_tensor(drive_id, query_id)
+        query_th = self.get_rangeimage_tensor(drive_id, query_id)
         for sp_id in sel_positive_ids:
-            positives.append(self.get_pointcloud_tensor(drive_id, sp_id))
+            positives.append(self.get_rangeimage_tensor(drive_id, sp_id))
         for sn_id in sel_negative_ids:
-            negatives.append(self.get_pointcloud_tensor(drive_id, sn_id))
+            negatives.append(self.get_rangeimage_tensor(drive_id, sn_id))
 
         meta_info = {'drive': drive_id, 'query_id': query_id}
 
@@ -203,7 +219,7 @@ class KittiTupleDataset(KittiDataset):
         else:  # For Quadruplet Loss
             other_neg_id = self.get_other_negative(
                 drive_id, query_id, sel_positive_ids, sel_negative_ids)
-            other_neg_th = self.get_pointcloud_tensor(drive_id, other_neg_id)
+            other_neg_th = self.get_rangeimage_tensor(drive_id, other_neg_id)
             return (query_th,
                     positives,
                     negatives,

@@ -16,12 +16,12 @@ def str2bool(v):
 
 # Evaluation
 eval_arg = add_argument_group('Eval')
-eval_arg.add_argument('--eval_pipeline', type=str, default='LOGG3D')
+eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer') # LOGG3D, OverlapTransformer
 eval_arg.add_argument('--kitti_eval_seq', type=int, default=8)
 eval_arg.add_argument('--mulran_eval_seq', type=str,
                       default='Riverside/Riverside_02')
 eval_arg.add_argument('--checkpoint_name', type=str,
-                      default='/kitti_10cm_loo/2021-09-14_20-28-22_3n24h_Kitti_v10_q29_10s8_263169.pth')
+                      default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_Default/pretrained_overlap_transformer27.pth')
 eval_arg.add_argument('--eval_batch_size', type=int, default=1)
 eval_arg.add_argument('--test_num_workers', type=int, default=1)
 eval_arg.add_argument("--eval_random_rotation", type=str2bool,
@@ -44,8 +44,8 @@ eval_arg.add_argument("--num_thresholds", default=1000, type=int,
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
-# KittiDataset #MulRanDataset
-data_arg.add_argument('--eval_dataset', type=str, default='KittiDataset')
+# KittiDataset #KittiRangeImageDataset #MulRanDataset
+data_arg.add_argument('--eval_dataset', type=str, default='KittiRangeImageDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument("--eval_save_descriptors", type=str2bool, default=False)
@@ -60,11 +60,11 @@ data_arg.add_argument('--eval_feature_distance', type=str,
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
-data_arg.add_argument('--kitti_dir', type=str, default='/mnt/088A6CBB8A6CA742/Datasets/Kitti/dataset/',
+data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/Data0/DataSets/kitti/dataset/',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    'val': [],
+    'train': [3, 4, 5, 6, 7, 8, 9],
+    'val': [2],
     'test': [0]
 })
 

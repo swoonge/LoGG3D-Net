@@ -3,6 +3,7 @@ import sys
 import random
 import numpy as np
 import logging
+from utils.data_utils.range_projection import range_projection
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from torchsparse.utils.quantize import sparse_quantize
