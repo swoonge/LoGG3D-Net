@@ -57,15 +57,15 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
     use_random_scale = False
     use_random_rotation = False
     use_random_occlusion = False
-    if phase in ['train', 'trainval']:
+    if phase in ['train', 'trainval', 'val']:
         use_random_rotation = config.use_random_rotation
         use_random_scale = config.use_random_scale
         use_random_occlusion = config.use_random_occlusion
         Dataset = dataset_str_mapping[config.dataset]
 
-    elif phase in ['val', 'test']:
-        use_random_rotation = config.eval_random_rotation
-        use_random_occlusion = config.eval_random_occlusion
+    elif phase in ['test']:
+        use_random_rotation = config.use_random_rotation
+        use_random_occlusion = config.use_random_scale
         Dataset = dataset_str_mapping[config.eval_dataset]
 
     dset = Dataset(phase,
@@ -75,7 +75,7 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
                    config=config)
 
     collation_type = config.collation_type
-    if (phase in ['train', 'trainval']):
+    if (phase in ['train', 'trainval', 'val']):
         if ('Tuple' in config.dataset):
             collation_type = 'tuple'
         if ('SparseTuple' in config.dataset):

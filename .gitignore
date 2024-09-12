@@ -1,6 +1,15 @@
 *.pyc
 *.pickle
 *.pth
+*.npy
+*.npz
+*.csv
+*.log
+*.txt
+*.json
+*.yaml
+*.yml
+*.pkl
 log*
 __pycache__
 slurm*

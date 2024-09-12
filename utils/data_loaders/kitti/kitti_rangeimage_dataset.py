@@ -96,10 +96,10 @@ class KittiRangeImageDataset(PointCloudDataset):
         drive_id = self.files[idx][0]
         t0 = self.files[idx][1]
 
-        range_img = self.get_rangeimage_tensor(drive_id, t0)
+        xyz0_th = self.get_rangeimage_tensor(drive_id, t0)
         meta_info = {'drive': drive_id, 't0': t0}
 
-        return (range_img,
+        return (xyz0_th,
                 meta_info)
 
 

@@ -67,10 +67,11 @@ class Evaluator_kitti:
                 poses_new.append(T_velo_cam.dot(pose0_inv).dot(pose).dot(T_cam_velo))
             self.poses = np.array(poses_new)
 
-            dir_path = os.path.dirname(preprocessed_pose_path)
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path)
-            np.save(preprocessed_pose_path, poses)
+            if self.args.eval_save_descriptors:
+                dir_path = os.path.dirname(preprocessed_pose_path)
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+                np.save(preprocessed_pose_path, poses)
 
     def load_descriptors(self):
         preprocessed_descriptor_path = os.path.join(self.preprocessed_data_path, self.args.eval_dataset, "descriptors_" + self.sequence + ".npy")
@@ -85,8 +86,8 @@ class Evaluator_kitti:
     def save_descriptors(self):
         preprocessed_descriptor_path = os.path.join(self.preprocessed_data_path, self.args.eval_dataset, "descriptors_" + self.sequence + ".npy")
         if isinstance(self.descriptors, np.ndarray):
-            print(preprocessed_descriptor_path)
-            np.save(preprocessed_descriptor_path, self.descriptors)
+            if self.args.eval_save_descriptors:
+                np.save(preprocessed_descriptor_path, self.descriptors)
         else:
             print("descriptors are not in np.ndarray format")
 
@@ -299,7 +300,7 @@ def __main__(args, model, device):
 
     import pickle
     # results 리스트를 파일로 저장
-    with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OT_LOGG3DLoss.pkl', 'wb') as file:
+    with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OT_Org.pkl', 'wb') as file:
         pickle.dump(metrics, file)
 
 
