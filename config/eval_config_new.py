@@ -16,8 +16,8 @@ def str2bool(v):
 
 # Evaluation
 eval_arg = add_argument_group('Eval')
-# eval_arg.add_argument('--eval_pipeline', type=str, default='LOGG3D') # LOGG3D, OverlapTransformer
-eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer') # LOGG3D, OverlapTransformer
+eval_arg.add_argument('--eval_pipeline', type=str, default='LOGG3D') # LOGG3D, OverlapTransformer
+# eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer') # LOGG3D, OverlapTransformer
 eval_arg.add_argument('--kitti_eval_seq', type=int, default=0)
 eval_arg.add_argument('--mulran_eval_seq', type=str,
                       default='Riverside/Riverside_02')
@@ -25,10 +25,10 @@ eval_arg.add_argument('--mulran_eval_seq', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_Default/pretrained_overlap_transformer127.pth.tar') # 오리지날 Ot, 내가 훈련
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/pretrained_overlap_transformer.pth.tar') # 오리지날 Ot, 저자 제공
-eval_arg.add_argument('--checkpoint_name', type=str,
-                      default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_val/24-09-11_11-07-04_0/epoch_best_79.pth')
 # eval_arg.add_argument('--checkpoint_name', type=str,
-#                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/LOGG3D_Default/24-09-06_11-09-45_0/epoch_28.pth')
+                    #   default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_val/24-09-11_11-07-04_0/epoch_best_79.pth')
+eval_arg.add_argument('--checkpoint_name', type=str,
+                      default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/LOGG3D_Default/24-09-06_11-09-45_0/epoch_28.pth')
 
 eval_arg.add_argument('--eval_batch_size', type=int, default=1)
 eval_arg.add_argument('--test_num_workers', type=int, default=1)
@@ -53,7 +53,7 @@ eval_arg.add_argument("--num_thresholds", default=500, type=int,
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
 # KittiDataset #KittiRangeImageDataset #MulRanDataset
-data_arg.add_argument('--eval_dataset', type=str, default='KittiRangeImageDataset') ######3
+data_arg.add_argument('--eval_dataset', type=str, default='KittiDataset') ######3
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default #sparcify_list
 data_arg.add_argument("--eval_save_descriptors", type=str2bool, default=False)
@@ -99,7 +99,7 @@ data_arg.add_argument('--use_random_scale', type=str2bool, default=False)
 data_arg.add_argument('--min_scale', type=float, default=0.8)
 data_arg.add_argument('--max_scale', type=float, default=1.2)
 
-data_arg.add_argument('--save_file_name', type=str, default='OT_LoGG3D_Loss', help='save file name')
+data_arg.add_argument('--save_file_name', type=str, default='LoGG3D_trained', help='save file name')
 data_arg.add_argument('--vis', type=bool, default=False, help='visualize the results')
 
 

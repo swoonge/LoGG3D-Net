@@ -16,7 +16,7 @@ def str2bool(v):
 
 # Training
 trainer_arg = add_argument_group('Train')
-trainer_arg.add_argument('--train_pipeline', type=str, default='OverlapTransformer') ############# LOGG3D, OverlapTransformer
+trainer_arg.add_argument('--train_pipeline', type=str, default='LOGG3D') ############# LOGG3D, OverlapTransformer
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
 
@@ -48,16 +48,16 @@ trainer_arg.add_argument('--scene_loss_weight', type=float, default=1.0)  # 0.1
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam' step
 opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
-opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
+opt_arg.add_argument('--base_learning_rate', type=float, default=1e-3) # 1e-3 ##############
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 opt_arg.add_argument('--scheduler', type=str,
-                     default='step')  # cosine#multistep step
+                     default='multistep')  # cosine #multistep step
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
 # KittiPointSparseTupleDataset #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiRangeImageTupleDataset') ##################
+                      default='KittiPointSparseTupleDataset') ##################
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -122,8 +122,8 @@ data_arg.add_argument('--max_scale', type=float, default=1.0)
 
 # Misc
 misc_arg = add_argument_group('Misc')
-# misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default')  ##############
-misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_val')  ##############
+misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default_val')  ##############
+# misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_val')  ##############
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)
