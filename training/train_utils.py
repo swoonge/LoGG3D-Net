@@ -44,7 +44,7 @@ def get_scheduler(cfg, optimizer):
     elif cfg.scheduler == 'multistep':
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,20,30,40], gamma=0.1)
     elif cfg.scheduler == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9) # default = 5, sp = 10
     else:
         raise NotImplementedError(cfg.scheduler)
     return scheduler

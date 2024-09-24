@@ -273,6 +273,14 @@ def __main__(args, model, device, file_name):
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 evaluator.put_descriptor(global_descriptor)
 
+            elif args.eval_pipeline == 'OverlapTransformer_sp':
+                input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
+                input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
+                output_desc = model(input_t)
+                global_descriptor = output_desc.cpu().detach().numpy()
+                global_descriptor = np.reshape(global_descriptor, (1, -1))
+                evaluator.put_descriptor(global_descriptor)
+
         # evaluator.save_descriptors()
         print("=================================")
         
@@ -299,12 +307,12 @@ def __main__(args, model, device, file_name):
     # plt.show()
 
     import pickle
-    # results 리스트를 파일로 저장
-    # with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OT_trained/' + file_name + '.pkl', 'wb') as file:
-    #     pickle.dump(metrics, file)
-    # with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_LOGG3D_trained/' + file_name + '.pkl', 'wb') as file:
-    #     pickle.dump(metrics, file)
-    with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OT_trained/' + file_name + '.pkl', 'wb') as file:
+
+    # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
+    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTsp_trained_111545/'
+    if not os.path.exists(save_folder_path):
+        os.makedirs(save_folder_path)
+    with open(save_folder_path + file_name + '.pkl', 'wb') as file:
         pickle.dump(metrics, file)
 
 
@@ -318,8 +326,8 @@ if __name__ == '__main__':
 
     ## get all epoch results
     dir_path = os.path.dirname(args.checkpoint_name)
-    file_list = os.listdir(dir_path)
-    # file_list = ['epoch_best_8.pth', 'epoch_best_10.pth', 'epoch_23.pth', 'epoch_26.pth'] # for LOGG3D Oringinal
+    # file_list = os.listdir(dir_path)
+    file_list = ['epoch_best_91.pth', 'epoch_best_117.pth', 'epoch_169.pth']
     
     for file in file_list:
         file_name =  os.path.splitext(os.path.basename(file))[0]
@@ -330,7 +338,7 @@ if __name__ == '__main__':
         ## load checkpoint
         print('Loading checkpoint from: ', os.path.join(dir_path, file))
         checkpoint = torch.load(os.path.join(dir_path, file))
-        model.load_state_dict(checkpoint['state_dict']) # state_dict, model_state_dict
+        model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
         model.eval()
         
         __main__(args, model, device, file_name)

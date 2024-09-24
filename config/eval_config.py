@@ -16,19 +16,21 @@ def str2bool(v):
 
 # Evaluation
 eval_arg = add_argument_group('Eval')
-# eval_arg.add_argument('--eval_pipeline', type=str, default='LOGG3D') # LOGG3D, OverlapTransformer
-eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer') # LOGG3D, OverlapTransformer
+# LOGG3D, OverlapTransformer, OverlapTransformer_sp
+eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer_sp')
 eval_arg.add_argument('--kitti_eval_seq', type=int, default=0)
 eval_arg.add_argument('--mulran_eval_seq', type=str,
                       default='Riverside/Riverside_02')
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_Default/pretrained_overlap_transformer127.pth.tar') # 오리지날 Ot, 내가 훈련
-eval_arg.add_argument('--checkpoint_name', type=str,
-                      default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/pretrained_overlap_transformer.pth.tar') # 오리지날 Ot, 저자 제공
+# eval_arg.add_argument('--checkpoint_name', type=str,
+#                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/pretrained_overlap_transformer.pth.tar') # 오리지날 Ot, 저자 제공
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_Default/24-09-05_10-54-57_0/epoch_47.pth')
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/LOGG3D_Default/24-09-06_11-09-45_0/epoch_28.pth')
+eval_arg.add_argument('--checkpoint_name', type=str,
+                      default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_sp_val/24-09-20_18-18-27_0/epoch_best_43.pth') # OTsp with logg3d 스케줄러
 
 eval_arg.add_argument('--eval_batch_size', type=int, default=1)
 eval_arg.add_argument('--test_num_workers', type=int, default=1)
@@ -53,7 +55,7 @@ eval_arg.add_argument("--num_thresholds", default=400, type=int,
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
 # KittiDataset #KittiRangeImageDataset #MulRanDataset
-data_arg.add_argument('--eval_dataset', type=str, default='KittiRangeImageDataset') ######3
+data_arg.add_argument('--eval_dataset', type=str, default='KittiRangeImageDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument("--eval_save_descriptors", type=str2bool, default=False)
@@ -64,7 +66,7 @@ data_arg.add_argument('--voxel_size', type=float, default=0.10)
 data_arg.add_argument("--gp_rem", type=str2bool,
                       default=False, help="Remove ground plane.")
 data_arg.add_argument('--eval_feature_distance', type=str,
-                      default='cosine')  # cosine#euclidean
+                      default='cosine')  # cosine #euclidean
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
@@ -98,7 +100,6 @@ data_arg.add_argument('--occlusion_angle', type=float, default=30)
 data_arg.add_argument('--use_random_scale', type=str2bool, default=False)
 data_arg.add_argument('--min_scale', type=float, default=0.8)
 data_arg.add_argument('--max_scale', type=float, default=1.2)
-
 
 def get_config_eval():
     args = parser.parse_args()
