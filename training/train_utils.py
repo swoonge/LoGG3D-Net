@@ -42,9 +42,11 @@ def get_scheduler(cfg, optimizer):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=10)
     elif cfg.scheduler == 'multistep':
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,20,30,40], gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,20,30,40], gamma=0.1)       
     elif cfg.scheduler == 'step':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9) # default = 5, sp = 10
+    elif cfg.scheduler == 'step2':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.3) # default = 5, sp = 10
     else:
         raise NotImplementedError(cfg.scheduler)
     return scheduler

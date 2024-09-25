@@ -5,6 +5,7 @@ from pipelines.PointNetVLAD import *
 from pipelines.LOGG3D import *
 from modules.overlap_transformer import *
 from modules.overlap_transformer_sp import *
+from modules.overlap_transformer_T import *
 
 
 def get_pipeline(pipeline_name):
@@ -17,6 +18,8 @@ def get_pipeline(pipeline_name):
         pipeline = OverlapTransformer(channels=1, use_transformer=True)
     elif pipeline_name == 'OverlapTransformer_sp':
         pipeline = OverlapTransformer_sp(channels=1, use_transformer=True)
+    elif pipeline_name == 'OverlapTransformer_T':
+        pipeline = OverlapTransformerViT(channels=1, patch_size=16)
     return pipeline
 
 
