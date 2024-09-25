@@ -7,7 +7,6 @@
 *.log
 *.txt
 *.json
-*.yaml
 *.yml
 
 log*
