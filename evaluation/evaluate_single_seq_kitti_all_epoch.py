@@ -265,21 +265,13 @@ def __main__(args, model, device, file_name):
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 evaluator.put_descriptor(global_descriptor)
 
-            elif args.eval_pipeline == 'OverlapTransformer':
+            elif args.eval_pipeline == 'OverlapTransformer' or args.eval_pipeline == 'OverlapTransformer_sp' or args.eval_pipeline == 'OverlapTransformer_T':
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
                 input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
                 output_desc = model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
-                evaluator.put_descriptor(global_descriptor)
-
-            elif args.eval_pipeline == 'OverlapTransformer_sp':
-                input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
-                input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
-                output_desc = model(input_t)
-                global_descriptor = output_desc.cpu().detach().numpy()
-                global_descriptor = np.reshape(global_descriptor, (1, -1))
-                evaluator.put_descriptor(global_descriptor)
+                evaluator.put_descriptor(global_descriptor)            
 
         # evaluator.save_descriptors()
         print("=================================")
@@ -309,7 +301,7 @@ def __main__(args, model, device, file_name):
     import pickle
 
     # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
-    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTsp_trained_111545/'
+    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT/'
     if not os.path.exists(save_folder_path):
         os.makedirs(save_folder_path)
     with open(save_folder_path + file_name + '.pkl', 'wb') as file:
@@ -327,7 +319,7 @@ if __name__ == '__main__':
     ## get all epoch results
     dir_path = os.path.dirname(args.checkpoint_name)
     # file_list = os.listdir(dir_path)
-    file_list = ['epoch_best_91.pth', 'epoch_best_117.pth', 'epoch_169.pth']
+    file_list = ['epoch_best_27.pth', 'epoch_38.pth', 'epoch_61.pth', 'epoch_72.pth']
     
     for file in file_list:
         file_name =  os.path.splitext(os.path.basename(file))[0]

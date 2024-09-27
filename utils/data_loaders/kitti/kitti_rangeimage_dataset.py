@@ -89,7 +89,7 @@ class KittiRangeImageDataset(PointCloudDataset):
     def get_rangeimage_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, pc_id)
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
-        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
+        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=1024, max_range=80)
         return range_image
 
     def __getitem__(self, idx):

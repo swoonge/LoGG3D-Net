@@ -6,6 +6,8 @@ from pipelines.LOGG3D import *
 from modules.overlap_transformer import *
 from modules.overlap_transformer_sp import *
 from modules.overlap_transformer_T import *
+from modules.overlap_transformer_ViT import *
+from modules.overlap_transformer_swinT import *
 
 
 def get_pipeline(pipeline_name):
@@ -19,7 +21,11 @@ def get_pipeline(pipeline_name):
     elif pipeline_name == 'OverlapTransformer_sp':
         pipeline = OverlapTransformer_sp(channels=1, use_transformer=True)
     elif pipeline_name == 'OverlapTransformer_T':
-        pipeline = OverlapTransformerViT(channels=1, patch_size=16)
+        pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16)
+    elif pipeline_name == 'OverlapTransformer_ViT':
+        pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16, num_layers=1)
+    elif pipeline_name == 'OverlapTransformer_SwinT':
+        pipeline = OverlapTransformerSwinT()
     return pipeline
 
 

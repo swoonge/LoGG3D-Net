@@ -156,7 +156,7 @@ def main():
                 running_scene_loss += scene_loss.item() 
                 loss = scene_loss
 
-            elif cfg.train_pipeline == 'OverlapTransformer_T':
+            elif cfg.train_pipeline == 'OverlapTransformer_T' or cfg.train_pipeline == 'OverlapTransformer_ViT':
                 if not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
@@ -168,6 +168,8 @@ def main():
                 scene_loss = loss_function(output, cfg)
                 running_scene_loss += scene_loss.item() 
                 loss = scene_loss
+
+            
 
             optimizer.zero_grad()
             loss.backward()
@@ -239,6 +241,16 @@ def main():
                     loss = scene_loss
                 
                 elif cfg.train_pipeline == 'OverlapTransformer_T':
+                    if not batch.shape[0] == 6:
+                        print("Batch size is not 6")
+                        continue
+                    current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device)
+                    output = model(current_batch)
+                    scene_loss = loss_function(output, cfg)
+                    val_scene_loss += scene_loss.item()
+                    loss = scene_loss
+                
+                elif cfg.train_pipeline == 'OverlapTransformer_ViT':
                     if not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
