@@ -89,8 +89,38 @@ class KittiRangeImageDataset(PointCloudDataset):
     def get_rangeimage_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, pc_id)
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
-        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=1024, max_range=80)
+        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
+        # range_image = self.fill_zero_rows(range_image)
         return range_image
+
+    def fill_zero_rows(self, depth_image):
+        # depth_image는 [64, 900] 형태라고 가정
+        depth_image = depth_image.copy()  # 원본 배열을 변경하지 않도록 복사
+
+        # 0이 있는 행의 인덱스를 찾음
+        zero_rows = np.where(np.all(depth_image == 0, axis=1))[0]
+
+        for row in zero_rows:
+            # 가장 가까운 행을 찾기 위해 위쪽, 아래쪽 모두 탐색
+            upper_row = row - 1
+            lower_row = row + 1
+
+            while upper_row >= 0 or lower_row < depth_image.shape[0]:
+                # 위쪽에 가장 가까운 0이 아닌 값을 찾음
+                if upper_row >= 0 and not np.all(depth_image[upper_row, :] == 0):
+                    depth_image[row, :] = depth_image[upper_row, :]
+                    break
+                
+                # 아래쪽에 가장 가까운 0이 아닌 값을 찾음
+                if lower_row < depth_image.shape[0] and not np.all(depth_image[lower_row, :] == 0):
+                    depth_image[row, :] = depth_image[lower_row, :]
+                    break
+                
+                # 위쪽과 아래쪽으로 계속해서 확장
+                upper_row -= 1
+                lower_row += 1
+
+        return depth_image
 
     def __getitem__(self, idx):
         drive_id = self.files[idx][0]

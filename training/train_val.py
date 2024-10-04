@@ -143,7 +143,7 @@ def main():
                 running_scene_loss += scene_loss.item() 
                 loss = scene_loss
 
-            elif cfg.train_pipeline == 'OverlapTransformer_sp':
+            elif cfg.train_pipeline == 'OverlapTransformer_resnet':
                 if not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
@@ -230,7 +230,7 @@ def main():
                     val_scene_loss += scene_loss.item()
                     loss = scene_loss
 
-                elif cfg.train_pipeline == 'OverlapTransformer_sp':
+                elif cfg.train_pipeline == 'OverlapTransformer_resnet':
                     if not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
@@ -280,6 +280,7 @@ def main():
         else:
             model_to_save = model
         torch.save({
+            'config': cfg,
             'epoch': epoch,
             'model_state_dict': model_to_save.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),

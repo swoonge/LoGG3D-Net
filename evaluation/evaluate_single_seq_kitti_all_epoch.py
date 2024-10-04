@@ -101,6 +101,8 @@ class Evaluator_kitti:
     def evaluate(self):
         if len(self.descriptors) < len(self.poses):
             print("Not enough data to evaluate")
+            print("Descriptors: ", len(self.descriptors))
+            print("Poses: ", len(self.poses))
             return
         matching_results = self.find_matching_poses()
 
@@ -265,7 +267,7 @@ def __main__(args, model, device, file_name):
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 evaluator.put_descriptor(global_descriptor)
 
-            elif args.eval_pipeline == 'OverlapTransformer' or args.eval_pipeline == 'OverlapTransformer_sp' or args.eval_pipeline == 'OverlapTransformer_T':
+            elif args.eval_pipeline == 'OverlapTransformer' or args.eval_pipeline == 'OverlapTransformer_resnet' or args.eval_pipeline == 'OverlapTransformer_T' or args.eval_pipeline == 'OverlapTransformer_ViT':
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
                 input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
                 output_desc = model(input_t)
@@ -301,7 +303,7 @@ def __main__(args, model, device, file_name):
     import pickle
 
     # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
-    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT/'
+    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT_torch/'
     if not os.path.exists(save_folder_path):
         os.makedirs(save_folder_path)
     with open(save_folder_path + file_name + '.pkl', 'wb') as file:
@@ -318,8 +320,8 @@ if __name__ == '__main__':
 
     ## get all epoch results
     dir_path = os.path.dirname(args.checkpoint_name)
-    # file_list = os.listdir(dir_path)
-    file_list = ['epoch_best_27.pth', 'epoch_38.pth', 'epoch_61.pth', 'epoch_72.pth']
+    file_list = os.listdir(dir_path)
+    # file_list = ['epoch_best_27.pth', 'epoch_38.pth', 'epoch_61.pth', 'epoch_72.pth']
     
     for file in file_list:
         file_name =  os.path.splitext(os.path.basename(file))[0]
@@ -331,6 +333,7 @@ if __name__ == '__main__':
         print('Loading checkpoint from: ', os.path.join(dir_path, file))
         checkpoint = torch.load(os.path.join(dir_path, file))
         model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
+        print('model training info: ', checkpoint['optimizer_state_dict'])
         model.eval()
         
         __main__(args, model, device, file_name)
