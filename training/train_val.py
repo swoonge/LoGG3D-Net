@@ -130,7 +130,7 @@ def main():
                 running_scene_loss += scene_loss.item()
                 loss = scene_loss
 
-            elif cfg.train_pipeline == 'OverlapTransformer':
+            elif cfg.train_pipeline == 'OverlapTransformer' or cfg.train_pipeline == 'OverlapTransformer_geo':
                 if not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
@@ -220,7 +220,7 @@ def main():
                     val_scene_loss += scene_loss.item()
                     loss = scene_loss
 
-                elif cfg.train_pipeline == 'OverlapTransformer':
+                elif cfg.train_pipeline == 'OverlapTransformer' or cfg.train_pipeline == 'OverlapTransformer_geo':
                     if not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue

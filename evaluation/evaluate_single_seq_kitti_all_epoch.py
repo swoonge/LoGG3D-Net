@@ -303,7 +303,7 @@ def __main__(args, model, device, file_name):
     import pickle
 
     # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
-    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT_torch/'
+    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTresnet_ViT/Oct02_19-35-59/'
     if not os.path.exists(save_folder_path):
         os.makedirs(save_folder_path)
     with open(save_folder_path + file_name + '.pkl', 'wb') as file:
@@ -333,7 +333,7 @@ if __name__ == '__main__':
         print('Loading checkpoint from: ', os.path.join(dir_path, file))
         checkpoint = torch.load(os.path.join(dir_path, file))
         model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
-        print('model training info: ', checkpoint['optimizer_state_dict'])
+        # print('model training info: ', checkpoint['optimizer_state_dict'])
         model.eval()
         
         __main__(args, model, device, file_name)

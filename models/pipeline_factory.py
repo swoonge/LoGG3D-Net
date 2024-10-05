@@ -8,6 +8,7 @@ from modules.overlap_transformer_resnet import *
 from modules.overlap_transformer_T import *
 from modules.overlap_transformer_ViT import *
 from modules.overlap_transformer_swinT import *
+from modules.overlap_transformer_geo import *
 
 
 def get_pipeline(pipeline_name):
@@ -26,6 +27,8 @@ def get_pipeline(pipeline_name):
         pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16, num_layers=1)
     elif pipeline_name == 'OverlapTransformer_SwinT':
         pipeline = OverlapTransformerSwinT()
+    elif pipeline_name == 'OverlapTransformer_geo':
+        pipeline = OverlapTransformer_geo(channels=1, use_transformer=True)
     return pipeline
 
 
