@@ -20,7 +20,7 @@ def get_pipeline(pipeline_name):
     elif pipeline_name == 'OverlapTransformer':
         pipeline = OverlapTransformer(channels=1, use_transformer=True)
     elif pipeline_name == 'OverlapTransformer_resnet':
-        pipeline = OverlapTransformer_resnet(channels=1, use_transformer=True, mode='CViT')
+        pipeline = OverlapTransformer_resnet(channels=1, use_transformer=True, mode='original')
     elif pipeline_name == 'OverlapTransformer_T':
         pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16)
     elif pipeline_name == 'OverlapTransformer_ViT':
