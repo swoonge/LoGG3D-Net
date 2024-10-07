@@ -8,6 +8,8 @@
 *.txt
 *.json
 *.yml
+*.pth
+*.tar
 
 log*
 __pycache__
@@ -18,4 +20,4 @@ pr_results
 checkpoints*
 runs*
 positive*
-modules*
+evaluation/weight/*
