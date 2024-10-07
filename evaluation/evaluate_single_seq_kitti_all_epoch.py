@@ -258,7 +258,7 @@ def __main__(args, model, device, file_name):
         for i, batch in enumerate(test_loader_progress_bar, 0):
             if i >= len(test_loader.dataset):
                 break
-            if args.eval_pipeline == 'LOGG3D':
+            if args.pipeline == 'LOGG3D':
                 lidar_pc = batch[0][0]
                 input_st = make_sparse_tensor(lidar_pc, args.voxel_size).to(device=device)   
                 output_desc, output_feats = model(input_st) 
@@ -267,7 +267,7 @@ def __main__(args, model, device, file_name):
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 evaluator.put_descriptor(global_descriptor)
 
-            elif args.eval_pipeline == 'OverlapTransformer' or args.eval_pipeline == 'OverlapTransformer_resnet' or args.eval_pipeline == 'OverlapTransformer_T' or args.eval_pipeline == 'OverlapTransformer_ViT':
+            elif args.pipeline.split('_')[0] == 'OverlapTransformer':
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
                 input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
                 output_desc = model(input_t)
@@ -303,7 +303,7 @@ def __main__(args, model, device, file_name):
     import pickle
 
     # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
-    save_folder_path = '/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTresnet_ViT/Oct02_19-35-59/'
+    save_folder_path = os.path.join(os.path.dirname(__file__), 'results', cfg.save_file_name)
     if not os.path.exists(save_folder_path):
         os.makedirs(save_folder_path)
     with open(save_folder_path + file_name + '.pkl', 'wb') as file:
@@ -319,15 +319,15 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ## get all epoch results
-    dir_path = os.path.dirname(args.checkpoint_name)
-    file_list = os.listdir(dir_path)
-    # file_list = ['epoch_best_27.pth', 'epoch_38.pth', 'epoch_61.pth', 'epoch_72.pth']
+    dir_path = os.path.dirname(args.checkpoint_name) if args.checkpoint_name[-4:] == '.pth' else args.checkpoint_name
+
+    # file_list = os.listdir(dir_path)
+    file_list = ['epoch_best_26.pth', 'epoch_best_29.pth', 'epoch_best_38.pth', 'epoch_best_42.pth']
     
     for file in file_list:
         file_name =  os.path.splitext(os.path.basename(file))[0]
         ## load model
-        model = get_pipeline(args.eval_pipeline)
-        model.to(device)
+        model = get_pipeline(args).to(device)
 
         ## load checkpoint
         print('Loading checkpoint from: ', os.path.join(dir_path, file))

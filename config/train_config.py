@@ -17,7 +17,8 @@ def str2bool(v):
 # Training
 trainer_arg = add_argument_group('Train')
 # LOGG3D, OverlapTransformer, OverlapTransformer_sp, OverlapTransformer_T, OverlapTransformer_SwinT
-trainer_arg.add_argument('--train_pipeline', type=str, default='OverlapTransformer_geo') 
+trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_geo')
+trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
 

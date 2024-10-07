@@ -17,7 +17,8 @@ def str2bool(v):
 # Evaluation
 eval_arg = add_argument_group('Eval')
 # LOGG3D, OverlapTransformer, OverlapTransformer_sp, OverlapTransformer_T, OverlapTransformer_T_res, OverlapTransformer_SwinT
-eval_arg.add_argument('--eval_pipeline', type=str, default='OverlapTransformer_resnet')
+eval_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_geo')
+eval_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 eval_arg.add_argument('--kitti_eval_seq', type=int, default=0)
 eval_arg.add_argument('--mulran_eval_seq', type=str,
                       default='Riverside/Riverside_02')
@@ -37,10 +38,12 @@ eval_arg.add_argument('--mulran_eval_seq', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/training/checkpoints/OverlapTransformer_ViT/24-09-25_17-36-26_0/epoch_best_27.pth') # OTViT/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT_torch
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                       default='/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTViT_torch/epoch_best_86.pth')
-eval_arg.add_argument('--checkpoint_name', type=str,
-                        default='/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTresnet_ViT/Oct02_19-35-59/epoch_best_27.pth')
+# eval_arg.add_argument('--checkpoint_name', type=str,
+#                         default='/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTresnet_ViT/Oct02_19-35-59/epoch_best_27.pth')
 # eval_arg.add_argument('--checkpoint_name', type=str,
 #                         default='/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OTresnet_ViT/111108/epoch_best_58.pth')
+eval_arg.add_argument('--checkpoint_name', type=str,
+                        default='/home/vision/GD_model/LoGG3D-Net/evaluation/weight/OverlapTransformer_geo/24-10-05_17-45-54_0')
 
 eval_arg.add_argument('--eval_batch_size', type=int, default=1)
 eval_arg.add_argument('--test_num_workers', type=int, default=1)
@@ -111,7 +114,7 @@ data_arg.add_argument('--use_random_scale', type=str2bool, default=False)
 data_arg.add_argument('--min_scale', type=float, default=0.8)
 data_arg.add_argument('--max_scale', type=float, default=1.2)
 
-data_arg.add_argument('--save_file_name', type=str, default='results_OTresnet_ViT/Oct02_19-35-59', help='save file name')
+data_arg.add_argument('--save_file_name', type=str, default='OverlapTransformer_geo/24-10-05_17-45-54_0', help='save file name')
 data_arg.add_argument('--vis', type=bool, default=False, help='visualize the results')
 
 
