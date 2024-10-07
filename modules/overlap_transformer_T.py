@@ -42,26 +42,6 @@ class CNNFeatureExtractor(nn.Module):
         x = self.relu(self.conv4(x))
         x = self.relu(self.conv5(x)) # [B, embed_dim, H, W]
         return x
-
-# class PatchEmbedding(nn.Module):
-#     def __init__(self, patch_size=8, embed_dim=256):
-#         super(PatchEmbedding, self).__init__()
-#         self.patch_size = patch_size
-#         self.embed_dim = embed_dim
-
-#     def forward(self, x):
-#         B, C, H, W = x.shape  # CNN을 거친 후의 피처 맵 크기 (C=embed_dim)
-        
-#         # CNN 출력 크기 H, W에 맞게 패치 단위로 나누기
-#         num_patches_h = H // self.patch_size
-#         num_patches_w = W // self.patch_size
-        
-#         # 패치 단위로 나누기 (CNN 피처 맵을 나눔)
-#         x = x.unfold(2, self.patch_size, self.patch_size).unfold(3, self.patch_size, self.patch_size)
-#         x = x.contiguous().view(B, C, -1, self.patch_size * self.patch_size)
-#         x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, self.embed_dim)  # [B, 패치 개수, 임베딩 차원]
-
-#         return x
     
 class PatchEmbedding(nn.Module):
     def __init__(self, in_chan, patch_size, embed_dim):

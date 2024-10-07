@@ -101,6 +101,8 @@ class Evaluator_kitti:
     def evaluate(self):
         if len(self.descriptors) < len(self.poses):
             print("Not enough data to evaluate")
+            print("Descriptors: ", len(self.descriptors))
+            print("Poses: ", len(self.poses))
             return
         matching_results = self.find_matching_poses()
 
@@ -235,11 +237,11 @@ class Evaluator_kitti:
         }
 
 @torch.no_grad()
-def __main__(args, model, device):
+def __main__(args, model, device, file_name):
 
     evaluator = Evaluator_kitti(args, args.kitti_data_split['test'][0])
 
-    load_descriptors_flag = evaluator.load_descriptors()
+    load_descriptors_flag = False
     if load_descriptors_flag == False:
         test_loader = make_data_loader(args,
                                     args.test_phase,
@@ -247,16 +249,16 @@ def __main__(args, model, device):
                                     num_workers=args.test_num_workers,
                                     shuffle=False)
         
-        test_loader_progress_bar = tqdm(test_loader)
-
         print("===== Generating Descriptors =====")
         print("= Dataset: ", args.eval_dataset)
         print("= Data Size: ", len(test_loader.dataset))
 
+        test_loader_progress_bar = tqdm(test_loader)
+
         for i, batch in enumerate(test_loader_progress_bar, 0):
             if i >= len(test_loader.dataset):
                 break
-            if args.eval_pipeline == 'LOGG3D':
+            if args.pipeline == 'LOGG3D':
                 lidar_pc = batch[0][0]
                 input_st = make_sparse_tensor(lidar_pc, args.voxel_size).to(device=device)   
                 output_desc, output_feats = model(input_st) 
@@ -265,15 +267,15 @@ def __main__(args, model, device):
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 evaluator.put_descriptor(global_descriptor)
 
-            elif args.eval_pipeline == 'OverlapTransformer':
+            elif args.pipeline.split('_')[0] == 'OverlapTransformer':
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=device)
                 input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=device)
                 output_desc = model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
-                evaluator.put_descriptor(global_descriptor)
+                evaluator.put_descriptor(global_descriptor)            
 
-        evaluator.save_descriptors()
+        # evaluator.save_descriptors()
         print("=================================")
         
     print("Evaluating ...")
@@ -290,36 +292,40 @@ def __main__(args, model, device):
         print(f"{key}: {value:.3f}")
     print("=================================")
 
-
-    plt.plot(evaluator.thresholds, f1_scores, marker='o')
-    plt.title("F1-Score Values")
-    plt.xlabel("Thresholds")  # x축 레이블 설정
-    plt.ylabel("F1-Score")
-    plt.grid(True)
-    plt.show()
-
     import pickle
-    # results 리스트를 파일로 저장
-    with open('/home/vision/GD_model/LoGG3D-Net/evaluation/results/results_OT_Org.pkl', 'wb') as file:
+
+    # results_OT_trained, results_LOGG3D_trained, results_OT_trained, results_OTsp_trained_181827
+    save_folder_path = os.path.join(os.path.dirname(__file__), 'results', args.save_file_name)
+    if not os.path.exists(save_folder_path):
+        os.makedirs(save_folder_path)
+    with open(save_folder_path + file_name + '.pkl', 'wb') as file:
         pickle.dump(metrics, file)
 
 
 if __name__ == '__main__':
-    from config.eval_config import get_config_eval
+    from config.eval_config_new import get_config_eval
     from models.pipeline_factory import get_pipeline
 
     ## get config and device info
     args = get_config_eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ## load model
-    model = get_pipeline(args.eval_pipeline)
-    model.to(device)
+    ## get all epoch results
+    dir_path = os.path.dirname(args.checkpoint_name) if args.checkpoint_name[-4:] == '.pth' else args.checkpoint_name
 
-    ## load checkpoint
-    print('Loading checkpoint from: ', args.checkpoint_name)
-    checkpoint = torch.load(args.checkpoint_name)
-    model.load_state_dict(checkpoint['state_dict']) # state_dict, model_state_dict
-    model.eval()
+    # file_list = os.listdir(dir_path)
+    file_list = ['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth']
     
-    __main__(args, model, device)
+    for file in file_list:
+        file_name =  os.path.splitext(os.path.basename(file))[0]
+        ## load model
+        model = get_pipeline(args).to(device)
+
+        ## load checkpoint
+        print('Loading checkpoint from: ', os.path.join(dir_path, file))
+        checkpoint = torch.load(os.path.join(dir_path, file))
+        model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
+        # print('model training info: ', checkpoint['optimizer_state_dict'])
+        model.eval()
+        
+        __main__(args, model, device, file_name)

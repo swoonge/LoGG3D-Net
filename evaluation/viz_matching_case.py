@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import torch
 import yaml
-from com_overlap import com_overlap
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.metrics import roc_auc_score, precision_recall_curve
 from scipy.spatial.distance import pdist, squareform

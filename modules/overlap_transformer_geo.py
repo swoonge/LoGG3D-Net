@@ -117,10 +117,8 @@ class OverlapTransformer_geo(nn.Module):
             num_layers=1 is suggested in our work.
         """
         self.learnable_pos_enc = LearnablePositionalEncoding(900, 256)
-        # encoder_layer = TransformerEncoder(input_dim=256, hid_dim=1024, n_heads=4, n_layers=1, pf_dim=1024, dropout=0.1, max_length=900).to(DEVICE)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=False,dropout=0.)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.1)
         self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
-        # self.transformer_encoder = RelativeTransformerEncoder(d_model=256, nhead=4, dim_feedforward=1024, num_layers=1)
 
         self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast1 = norm_layer(256)
@@ -171,9 +169,9 @@ class OverlapTransformer_geo(nn.Module):
         if self.use_transformer:
             out_l = out_l_1.squeeze(3) # [6, 256, 900]
             out_l = self.learnable_pos_enc(out_l) # [6, 256, 900]
-            out_l = out_l.permute(2, 0, 1) # [900, 6, 256]
+            out_l = out_l.permute(0, 2, 1) # [6, 900, 256]
             out_l = self.transformer_encoder(out_l)
-            out_l = out_l.permute(1, 2, 0)
+            out_l = out_l.permute(0, 2, 1) # [6, 256, 900]
             out_l = out_l.unsqueeze(3)
             out_l = torch.cat((out_l_1, out_l), dim=1)
             out_l = self.relu(self.convLast2(out_l))
@@ -190,24 +188,24 @@ class OverlapTransformer_geo(nn.Module):
         return out_l
 
 
-# if __name__ == '__main__':
-#     # load config ================================================================
-#     config_filename = '../config/config.yml'
-#     config = yaml.safe_load(open(config_filename))
-#     seqs_root = config["data_root"]["data_root_folder"]
-#     # ============================================================================
+if __name__ == '__main__':
+    # load config ================================================================
+    config_filename = '../config/config.yml'
+    config = yaml.safe_load(open(config_filename))
+    seqs_root = config["data_root"]["data_root_folder"]
+    # ============================================================================
 
-#     combined_tensor = read_one_need_from_seq(seqs_root, "000000","00")
-#     combined_tensor = torch.cat((combined_tensor,combined_tensor), dim=0)
+    combined_tensor = read_one_need_from_seq(seqs_root, "000000","00")
+    combined_tensor = torch.cat((combined_tensor,combined_tensor), dim=0)
 
-#     feature_extracter=featureExtracter(use_transformer=True, channels=1)
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     feature_extracter.to(device)
-#     feature_extracter.eval()
+    feature_extracter=featureExtracter(use_transformer=True, channels=1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    feature_extracter.to(device)
+    feature_extracter.eval()
 
-#     print("model architecture: \n")
-#     print(feature_extracter)
+    print("model architecture: \n")
+    print(feature_extracter)
 
-#     gloabal_descriptor = feature_extracter(combined_tensor)
-#     print("size of gloabal descriptor: \n")
-#     print(gloabal_descriptor.size())
+    gloabal_descriptor = feature_extracter(combined_tensor)
+    print("size of gloabal descriptor: \n")
+    print(gloabal_descriptor.size())
