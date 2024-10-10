@@ -6,7 +6,6 @@
 *.csv
 *.log
 *.txt
-*.json
 *.yml
 *.pth
 *.tar
