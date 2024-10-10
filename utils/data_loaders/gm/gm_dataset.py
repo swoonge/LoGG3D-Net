@@ -14,7 +14,7 @@ from utils.data_loaders.pointcloud_dataset import *
 
 class GMDataset(PointCloudDataset):
     r"""
-    Generate single pointcloud frame from KITTI odometry dataset. 
+    Generate single pointcloud frame from gm odometry dataset. 
     """
 
     def __init__(self,
@@ -24,7 +24,7 @@ class GMDataset(PointCloudDataset):
                  random_scale=False,
                  config=None):
 
-        self.root = root = config.kitti_dir
+        self.root = root = config.gm_dir
         self.gp_rem = config.gp_rem
         self.pnv_prep = config.pnv_preprocessing
         self.timer = Timer()
@@ -32,12 +32,12 @@ class GMDataset(PointCloudDataset):
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
 
-        logging.info("Initializing KittiDataset")
+        logging.info("Initializing GMDataset")
         logging.info(f"Loading the subset {phase} from {root}")
         if self.gp_rem:
             logging.info("Dataloader initialized with Ground Plane removal.")
 
-        sequences = config.kitti_data_split[phase]
+        sequences = config.gm_data_split[phase]
         for drive_id in sequences:
             drive_id = int(drive_id)
             inames = self.get_all_scan_ids(drive_id, is_sorted=True)
@@ -115,7 +115,7 @@ class GMTupleDataset(GMDataset):
                  random_occlusion=False,
                  random_scale=False,
                  config=None):
-        self.root = root = config.kitti_dir
+        self.root = root = config.gm_dir
         self.positives_per_query = config.positives_per_query
         self.negatives_per_query = config.negatives_per_query
         self.quadruplet = False
@@ -127,15 +127,15 @@ class GMTupleDataset(GMDataset):
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
 
-        logging.info("Initializing KittiTupleDataset")
+        logging.info("Initializing GMTupleDataset")
         logging.info(f"Loading the subset {phase} from {root}")
 
-        sequences = config.kitti_data_split[phase]
+        sequences = config.gm_data_split[phase]
         tuple_dir = os.path.join(os.path.dirname(
-            __file__), '../../../config/kitti_tuples/')
-        self.dict_3m = json.load(open(tuple_dir + config.kitti_3m_json, "r"))
-        self.dict_20m = json.load(open(tuple_dir + config.kitti_20m_json, "r"))
-        self.kitti_seq_lens = config.kitti_seq_lens
+            __file__), '../../../config/gm_tuples/')
+        self.dict_3m = json.load(open(tuple_dir + config.gm_3m_json, "r"))
+        self.dict_20m = json.load(open(tuple_dir + config.gm_20m_json, "r"))
+        self.gm_seq_lens = config.gm_seq_lens
         for drive_id in sequences:
             drive_id = int(drive_id)
             fnames = glob.glob(
@@ -166,7 +166,7 @@ class GMTupleDataset(GMDataset):
         sq = str(int(sq))
         assert sq in self.dict_20m.keys(), f"Error: Sequence {sq} not in json."
         sq_2 = self.dict_20m[sq]
-        all_ids = set(np.arange(self.kitti_seq_lens[sq]))
+        all_ids = set(np.arange(self.gm_seq_lens[sq]))
         neg_set_inv = sq_2[str(int(index))]
         neg_set = all_ids.difference(neg_set_inv)
         negatives = list(neg_set)
@@ -176,7 +176,7 @@ class GMTupleDataset(GMDataset):
 
     def get_other_negative(self, drive_id, query_id, sel_positive_ids, sel_negative_ids):
         # Dissimillar to all pointclouds in triplet tuple.
-        all_ids = range(self.kitti_seq_lens[str(drive_id)])
+        all_ids = range(self.gm_seq_lens[str(drive_id)])
         neighbour_ids = sel_positive_ids
         for neg in sel_negative_ids:
             neg_postives_files = self.get_positives(drive_id, neg)

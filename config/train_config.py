@@ -51,7 +51,7 @@ opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
 opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
 opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
-opt_arg.add_argument('--momentum', type=float, default=0.9)  # 0.9
+opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 #cosine #multistep(LoGG3D) #step(ot),. step2
 opt_arg.add_argument('--scheduler', type=str,
                      default='step2') 
@@ -60,7 +60,7 @@ opt_arg.add_argument('--scheduler', type=str,
 data_arg = add_argument_group('Data')
 # KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangImageTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='GMRangImageTupleDataset')
+                      default='KittiRangeImageTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -80,9 +80,9 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [3, 5, 6, 7, 8, 9, 10],
-    'val': [2],
-    'test': [0]
+    'train': [1, 2, 3, 5, 6, 7, 9, 10],
+    'val': [8],
+    'test': [8]
 })
 
 data_arg.add_argument('--mulran_dir', type=str,
@@ -116,9 +116,9 @@ data_arg.add_argument('--gm_20m_json', type=str,
 data_arg.add_argument('--gm_seq_lens', type=dict, default={
     "07_01": 4150, "07_02": 6283, "08_01": 5340,"08_02": 5410})
 data_arg.add_argument('--gm_data_split', type=dict, default={
-    'train': ['07_01', '07_02','08_02'],
-    'val': ['08_02'],
-    'test': ['08_01']
+    'train': ['07_02', '08_01', '08_02'],
+    'val': ['07_01'],
+    'test': ['07_01']
 })
 
 # Data loader configs
@@ -142,7 +142,7 @@ data_arg.add_argument('--max_scale', type=float, default=1.0)
 # Misc
 misc_arg = add_argument_group('Misc')
 # misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default_val')  ##############
-misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_geo')  ##############
+misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer')  ##############
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)

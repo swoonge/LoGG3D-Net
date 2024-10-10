@@ -49,8 +49,10 @@ def get_scheduler(cfg, optimizer):
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9) # default = 5, sp = 10
     elif cfg.scheduler == 'step2':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.6) # default = 5, sp = 10
+    elif cfg.scheduler == 'ot_multistep':
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 30, 50, 70, 90], gamma=0.2)  # default=1e-4
     elif cfg.scheduler == 'geo_multistep':
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 30, 50, 70, 90], gamma=0.2)  
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 30, 50, 70, 90], gamma=0.2)  # default=1e-4
     else:
         raise NotImplementedError(cfg.scheduler)
     return scheduler
