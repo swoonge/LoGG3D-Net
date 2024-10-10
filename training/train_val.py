@@ -86,6 +86,7 @@ def main():
         running_loss = 0.0
         running_scene_loss = 0.0
         running_point_loss = 0.0
+        metric_epoch_loss = 0.0
         val_loss = 0.0
 
         model.train()
@@ -127,8 +128,9 @@ def main():
 
                 ## loss
                 scene_loss = loss_function(output, cfg)
-                running_scene_loss += scene_loss.item() 
-                loss = scene_loss            
+                running_scene_loss += scene_loss.item()
+                metric_epoch_loss += scene_loss.item()
+                loss = scene_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -147,8 +149,8 @@ def main():
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
-
-        scheduler.step()
+        metric_epoch_loss = metric_epoch_loss / len(train_loader)
+        scheduler.step(metric_epoch_loss)
 
         print("Validation")
         logger.info('**** Validation %03d ****' % (epoch))
