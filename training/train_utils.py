@@ -41,6 +41,8 @@ def get_scheduler(cfg, optimizer):
     elif cfg.scheduler == 'cosine':
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=10)
+    elif cfg.scheduler == 'ReduceLROnPlateau':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=5)
     elif cfg.scheduler == 'multistep':
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,20,30,40], gamma=0.1)
     elif cfg.scheduler == 'multistep2':

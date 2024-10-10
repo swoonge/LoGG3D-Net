@@ -52,9 +52,9 @@ opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
 opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
 opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
-#cosine #multistep(LoGG3D) #step(ot),. step2
+#cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
 opt_arg.add_argument('--scheduler', type=str,
-                     default='step2') 
+                     default='ReduceLROnPlateau') 
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')

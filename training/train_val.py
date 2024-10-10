@@ -81,8 +81,8 @@ def main():
 
     for epoch in range(starting_epoch, cfg.max_epoch):
         
-        lr = scheduler.get_last_lr()
-        logging.info('**** EPOCH %03d ****' % (epoch) + ' LR: %03f' % (lr[0]))
+        lr = optimizer.param_groups[0]['lr']
+        logging.info('**** EPOCH %03d ****' % (epoch) + ' LR: %03f' % (lr))
         running_loss = 0.0
         running_scene_loss = 0.0
         running_point_loss = 0.0
@@ -140,8 +140,8 @@ def main():
                 avg_scene_loss = running_scene_loss / cfg.loss_log_step
                 avg_point_loss = running_point_loss / cfg.loss_log_step
 
-                lr = scheduler.get_last_lr()
-                tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr[0]) + 
+                lr = optimizer.param_groups[0]['lr']
+                tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr) + 
                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
                 writer.add_scalar('training loss', avg_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
@@ -216,9 +216,9 @@ def main():
             'loss': loss
         }, save_path)
         
-        lr = scheduler.get_last_lr()
+        lr = optimizer.param_groups[0]['lr']
         logger.info('val loss: ' + str(val_loss)[:7])
-        writer.add_scalar('lr', lr[0], epoch)
+        writer.add_scalar('lr', lr, epoch)
         writer.add_scalar('val loss', val_loss, epoch)
 
     logging.info("Finished training.")
