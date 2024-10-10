@@ -11,12 +11,12 @@ import torch
 
 def log_config(cfg, logging):
     for gpu_id in range(torch.cuda.device_count()):
-        logging.info(str(gpu_id) + ' ' + torch.cuda.get_device_name(gpu_id))
-    logging.info('\n' + '===> Configurations')
+        logging.info('    Device_' + str(gpu_id) + ' ' + torch.cuda.get_device_name(gpu_id))
+    logging.info('=====> Configurations')
     dconfig = vars(cfg)
     for k in dconfig:
         logging.info('    {}: {}'.format(k, dconfig[k]))
-    logging.info('\n' + '\n')
+    logging.info('<=====')
 
 #####################################################################################
 # Place recognition

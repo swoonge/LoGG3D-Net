@@ -16,8 +16,8 @@ def str2bool(v):
 
 # Training
 trainer_arg = add_argument_group('Train')
-# LOGG3D, OverlapTransformer, OverlapTransformer_sp, OverlapTransformer_T, OverlapTransformer_SwinT
-trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_geo')
+# LOGG3D, OverlapTransformer, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo
+trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer')
 trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
@@ -50,17 +50,17 @@ trainer_arg.add_argument('--scene_loss_weight', type=float, default=1.0)  # 0.1
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
 opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
-opt_arg.add_argument('--base_learning_rate', type=float, default=1e-4) # 1e-3 ##############
+opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
 opt_arg.add_argument('--momentum', type=float, default=0.9)  # 0.9
 #cosine #multistep(LoGG3D) #step(ot),. step2
 opt_arg.add_argument('--scheduler', type=str,
-                     default='geo_multistep') 
+                     default='step2') 
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
-# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot)
+# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangImageTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiRangeImageTupleDataset')
+                      default='GMRangImageTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -103,6 +103,22 @@ data_arg.add_argument('--mulran_data_split', type=dict, default={
               'Riverside/Riverside_01', 'Riverside/Riverside_03'],
     'val': [],
     'test': ['KAIST/KAIST_01']
+})
+
+data_arg.add_argument('--gm_dir', type=str,
+                      default='/media/vision/Data0/DataSets/gm_datasets', help="Path to the gm dataset")
+data_arg.add_argument("--gm_normalize_intensity", type=str2bool,
+                      default=False, help="Normalize intensity return.")
+data_arg.add_argument('--gm_3m_json', type=str,
+                      default='positive_sequence_D-3_T-0.json')
+data_arg.add_argument('--gm_20m_json', type=str,
+                      default='positive_sequence_D-20_T-0.json')
+data_arg.add_argument('--gm_seq_lens', type=dict, default={
+    "07_01": 4150, "07_02": 6283, "08_01": 5340,"08_02": 5410})
+data_arg.add_argument('--gm_data_split', type=dict, default={
+    'train': ['07_01', '07_02','08_02'],
+    'val': ['08_02'],
+    'test': ['08_01']
 })
 
 # Data loader configs

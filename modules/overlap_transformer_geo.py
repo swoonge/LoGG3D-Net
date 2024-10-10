@@ -35,6 +35,22 @@ def compute_cosine_similarity_matrix(tensor, eps=1e-8):
     
     return cosine_similarity_matrix
 
+@torch.no_grad()
+def compute_l2distance_matrix(tensor, eps=1e-8):
+    # tensor: (batch_size, num_queries, feature_dim)
+    
+    # 각 벡터의 제곱합을 계산: (batch_size, num_queries, 1)
+    tensor_sq = (tensor ** 2).sum(dim=-1, keepdim=True)
+    
+    # 두 벡터의 제곱합 차이를 계산
+    # A^2 + B^2 - 2AB 공식을 사용
+    distances = tensor_sq + tensor_sq.transpose(1, 2) - 2 * torch.bmm(tensor, tensor.transpose(1, 2))
+    
+    # eps로 수치 안정성을 위한 최소값 처리
+    distance_matrix = torch.clamp(distances, min=eps)
+    
+    return distance_matrix
+
 class LearnablePositionalEncoding(nn.Module):
     def __init__(self, seq_len, d_model):
         super(LearnablePositionalEncoding, self).__init__()
@@ -59,17 +75,18 @@ class LearnablePositionalEncoding(nn.Module):
     @torch.no_grad()
     def angle_position(self, tensor):
         # tensor: (batch_size, num_queries, feature_dim)
+        # print(tensor.size())
         batch_size, num_queries, feature_dim = tensor.shape
         
         # 코사인 유사도 계산: (batch_size, num_queries, num_queries)
-        cosine_similarity_matrix = compute_cosine_similarity_matrix(tensor)
+        cosine_similarity_matrix = compute_l2distance_matrix(tensor)
         
         # 자기 자신과의 유사도를 무한대로 설정하여 제외
         eye_mask = torch.eye(num_queries, device=tensor.device, dtype=cosine_similarity_matrix.dtype).unsqueeze(0)
-        cosine_similarity_matrix = cosine_similarity_matrix + eye_mask * -float('inf')
+        cosine_similarity_matrix = cosine_similarity_matrix + eye_mask * float('inf')
         
         # 가장 유사한 (가장 가까운) 쿼리의 인덱스를 찾음
-        most_similar_indices = torch.argmax(cosine_similarity_matrix, dim=-1)
+        most_similar_indices = torch.argmin(cosine_similarity_matrix, dim=-1)
         
         # 현재 인덱스와 most_similar_indices 간의 각도 차이 계산
         current_indices = torch.arange(num_queries, device=tensor.device).unsqueeze(0)  # (1, num_queries)
@@ -162,16 +179,18 @@ class OverlapTransformer_geo(nn.Module):
         out_l = self.relu(self.conv10(out_l))
         out_l = self.relu(self.conv11(out_l)) # [batch, feature, H, W] [6, 128, 1, 900]
 
-        out_l_1 = out_l.permute(0,1,3,2) # [6, 128, 900, 1]
-        out_l_1 = self.relu(self.convLast1(out_l_1)) # [6, 256, 900, 1]
+        out_l = out_l.permute(0,1,3,2) # [6, 128, 900, 1]
+        out_l = self.relu(self.convLast1(out_l)) # [6, 256, 900, 1]
 
         """Using transformer needs to decide whether batch_size first"""
         if self.use_transformer:
-            out_l = out_l_1.squeeze(3) # [6, 256, 900]
+            out_l = out_l.squeeze(3) # [6, 256, 900]
             out_l = self.learnable_pos_enc(out_l) # [6, 256, 900]
+            out_l_1 = out_l
             out_l = out_l.permute(0, 2, 1) # [6, 900, 256]
             out_l = self.transformer_encoder(out_l)
             out_l = out_l.permute(0, 2, 1) # [6, 256, 900]
+            out_l_1 = out_l_1.unsqueeze(3)
             out_l = out_l.unsqueeze(3)
             out_l = torch.cat((out_l_1, out_l), dim=1)
             out_l = self.relu(self.convLast2(out_l))
@@ -187,25 +206,21 @@ class OverlapTransformer_geo(nn.Module):
 
         return out_l
 
-
+from config.train_config import get_config
 if __name__ == '__main__':
     # load config ================================================================
-    config_filename = '../config/config.yml'
-    config = yaml.safe_load(open(config_filename))
-    seqs_root = config["data_root"]["data_root_folder"]
+    config = get_config()
     # ============================================================================
 
-    combined_tensor = read_one_need_from_seq(seqs_root, "000000","00")
-    combined_tensor = torch.cat((combined_tensor,combined_tensor), dim=0)
-
-    feature_extracter=featureExtracter(use_transformer=True, channels=1)
+    torch.backends.cudnn.benchmark = True
+    feature_extracter=OverlapTransformer_geo(use_transformer=True, channels=1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     feature_extracter.to(device)
     feature_extracter.eval()
+    random_tensor = torch.randn(6, 1, 64, 900).to(device)
 
-    print("model architecture: \n")
-    print(feature_extracter)
+    # print("model architecture: \n")
+    # print(feature_extracter)
 
-    gloabal_descriptor = feature_extracter(combined_tensor)
-    print("size of gloabal descriptor: \n")
-    print(gloabal_descriptor.size())
+    gloabal_descriptor = feature_extracter(random_tensor)
+    print(f"size of gloabal descriptor: {gloabal_descriptor.size()}")

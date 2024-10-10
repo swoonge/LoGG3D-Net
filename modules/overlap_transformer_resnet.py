@@ -202,14 +202,14 @@ class OverlapTransformer_resnet(nn.Module):
         if self.mode == 'original':
             self.cnn_backborn = ResNetPanoramaCNN()
             self.conv_backborn_last = ReduceHeightNet()
-            encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=False, dropout=0.1)
+            encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.1)
             self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
             self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=225, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
         elif self.mode == 'CViT':
             self.cnn_backborn = ResNetPanoramaCNNViT()
-            encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=False, dropout=0.1)
+            encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.1)
             self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
             self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=904, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
@@ -249,10 +249,10 @@ class OverlapTransformer_resnet(nn.Module):
 
             """Using transformer needs to decide whether batch_size first"""
             out_l = out_l_1.squeeze(3) # [6, 256, 225] [batch, dim, width]
-            out_l = out_l.permute(2, 0, 1) # [225, 6, 256] [width, batch, dim]
+            out_l = out_l.permute(0, 2, 1) # [225, 6, 256] [width, batch, dim]
             # print(out_l.shape) # torch.Size([225, 6, 256])
             out_l = self.transformer_encoder(out_l)
-            out_l = out_l.permute(1, 2, 0)
+            out_l = out_l.permute(0, 2, 1)
             # print(out_l.shape) # torch.Size([6, 256, 225])
             out_l = out_l.unsqueeze(3) # [6, 256, 225, 1]
             out_l = torch.cat((out_l_1, out_l), dim=1) # [6, 512, 225, 1]

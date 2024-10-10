@@ -39,9 +39,9 @@ class OverlapTransformer(nn.Module):
 
         self.use_transformer = use_transformer
 
-        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(1,1), bias=False)
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(1,1), bias=False) # [batch, 16, 60, 900]
         self.bn1 = norm_layer(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3,1), stride=(2,1), bias=False)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3,1), stride=(2,1), bias=False) # [batch, 32, 29, 900]
         self.bn2 = norm_layer(32)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=(3,1), stride=(2,1), bias=False)
         self.bn3 = norm_layer(64)
@@ -67,7 +67,7 @@ class OverlapTransformer(nn.Module):
             MHSA
             num_layers=1 is suggested in our work.
         """
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=False,dropout=0.)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.)
         self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast1 = norm_layer(256)
@@ -116,9 +116,9 @@ class OverlapTransformer(nn.Module):
         """Using transformer needs to decide whether batch_size first"""
         if self.use_transformer:
             out_l = out_l_1.squeeze(3)
-            out_l = out_l.permute(2, 0, 1)
+            out_l = out_l.permute(0, 2, 1)
             out_l = self.transformer_encoder(out_l)
-            out_l = out_l.permute(1, 2, 0)
+            out_l = out_l.permute(0, 2, 1)
             out_l = out_l.unsqueeze(3)
             out_l = torch.cat((out_l_1, out_l), dim=1)
             out_l = self.relu(self.convLast2(out_l))

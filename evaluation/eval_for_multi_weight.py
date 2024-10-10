@@ -309,12 +309,13 @@ if __name__ == '__main__':
     ## get config and device info
     args = get_config_eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
     ## get all epoch results
     dir_path = os.path.dirname(args.checkpoint_name) if args.checkpoint_name[-4:] == '.pth' else args.checkpoint_name
 
     # file_list = os.listdir(dir_path)
-    file_list = ['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth']
+    file_list = ['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth', 'epoch_54.pth', 'epoch_72.pth']
     
     for file in file_list:
         file_name =  os.path.splitext(os.path.basename(file))[0]
