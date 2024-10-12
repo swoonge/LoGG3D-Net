@@ -14,7 +14,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
-from config.train_config import get_config
+from config.train_config_server import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
 

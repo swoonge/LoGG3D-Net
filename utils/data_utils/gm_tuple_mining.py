@@ -6,7 +6,7 @@ import json
 import numpy as np
 from tqdm import tqdm
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from config.train_config import get_config
+from config.train_config_server import get_config
 from utils.data_loaders.gm.gm_dataset import load_poses_from_txt, load_timestamps
 cfg = get_config()
 
@@ -51,6 +51,7 @@ def get_positive_dict(basedir, sequences, output_dir, d_thresh, t_thresh):
                         positive_dict[sequence_id][t1] = []
                     positive_dict[sequence_id][t1].append(t2)
 
+    print(positive_dict.keys())
     save_file_name = '{}/positive_sequence_D-{}_T-{}.json'.format(
         output_dir, d_thresh, t_thresh)
     with open(save_file_name, 'w') as f:
@@ -63,10 +64,12 @@ def get_positive_dict(basedir, sequences, output_dir, d_thresh, t_thresh):
 #####################################################################################
 if __name__ == "__main__":
     basedir = cfg.gm_dir
-    sequences = ['07_01', '07_02', '08_01','08_02']
+    sequences = ['00', '01', '02', '03']
     output_dir = os.path.join(os.path.dirname(
         __file__), '../../config/gm_tuples/')
 
     t_thresh = 0
+    get_positive_dict(basedir, sequences, output_dir, 2, t_thresh)
     get_positive_dict(basedir, sequences, output_dir, 3, t_thresh)
+    get_positive_dict(basedir, sequences, output_dir, 10, t_thresh)
     get_positive_dict(basedir, sequences, output_dir, 20, t_thresh)

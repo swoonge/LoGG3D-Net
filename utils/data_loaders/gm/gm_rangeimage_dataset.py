@@ -46,7 +46,7 @@ class GMRangeImageDataset(PointCloudDataset):
 
     def get_all_scan_ids(self, drive_id, is_sorted=False):
         fnames = glob.glob(
-            self.root + '/sequences/%02d/velodyne/*.bin' % drive_id)
+            self.root + '/%02d/velodyne/*.bin' % drive_id)
         assert len(
             fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
         inames = [int(os.path.split(fname)[-1][:-4]) for fname in fnames]
@@ -55,11 +55,11 @@ class GMRangeImageDataset(PointCloudDataset):
         return inames
 
     def get_velodyne_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
+        fname = self.root + '/%02d/velodyne/%06d.bin' % (drive, t)
         return fname
     
     def get_rangeimage_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/depth_map/%06d.png' % (drive, t)
+        fname = self.root + '/%02d/depth_map/%06d.png' % (drive, t)
         return fname
 
     def get_pointcloud_tensor(self, drive_id, pc_id):
@@ -169,11 +169,16 @@ class GMRangeImageTupleDataset(GMRangeImageDataset):
         for drive_id in sequences:
             drive_id = int(drive_id)
             fnames = glob.glob(
-                root + '/sequences/%02d/velodyne/*.bin' % drive_id)
+                root + '/%02d/velodyne/*.bin' % drive_id)
             assert len(
                 fnames) > 0, f"Make sure that the path {root} has data {drive_id}"
             inames = sorted([int(os.path.split(fname)[-1][:-4])
                             for fname in fnames])
+                            
+            # print(f"Processing drive {drive_id}")
+            # print(f"Number of frames: {len(inames)}")
+            # print(f"Maxium frame id: {max(inames)}")
+            # print(inames)
 
             for query_id in inames:
                 positives = self.get_positives(drive_id, query_id)
