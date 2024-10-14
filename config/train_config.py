@@ -58,9 +58,9 @@ opt_arg.add_argument('--scheduler', type=str,
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
-# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangImageTupleDataset
+# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiRangeImageTupleDataset')
+                      default='GMRangeImageTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -80,9 +80,9 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 2, 3, 5, 6, 7, 9, 10],
-    'val': [8],
-    'test': [8]
+    'train': [1, 3, 5, 6, 7, 8, 9, 10],
+    'val': [2],
+    'test': [0]
 })
 
 data_arg.add_argument('--mulran_dir', type=str,
@@ -110,15 +110,15 @@ data_arg.add_argument('--gm_dir', type=str,
 data_arg.add_argument("--gm_normalize_intensity", type=str2bool,
                       default=False, help="Normalize intensity return.")
 data_arg.add_argument('--gm_3m_json', type=str,
-                      default='positive_sequence_D-3_T-0.json')
+                      default='positive_sequence_D-2_T-0.json')
 data_arg.add_argument('--gm_20m_json', type=str,
-                      default='positive_sequence_D-20_T-0.json')
+                      default='positive_sequence_D-10_T-0.json')
 data_arg.add_argument('--gm_seq_lens', type=dict, default={
-    "07_01": 4150, "07_02": 6283, "08_01": 5340,"08_02": 5410})
+    "0": 4150, "1": 6283, "2": 5340,"3": 5410})
 data_arg.add_argument('--gm_data_split', type=dict, default={
-    'train': ['07_02', '08_01', '08_02'],
-    'val': ['07_01'],
-    'test': ['07_01']
+    'train': [0, 1, 3],
+    'val': [2],
+    'test': [2]
 })
 
 # Data loader configs
