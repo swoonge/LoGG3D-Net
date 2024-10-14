@@ -119,7 +119,7 @@ def main():
                 loss = scene_loss
 
             elif cfg.pipeline.split('_')[0] == 'OverlapTransformer':
-                if not batch.shape[0] == 6:
+                if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
                 
@@ -183,7 +183,7 @@ def main():
                     loss = scene_loss
 
                 elif cfg.pipeline.split('_')[0] == 'OverlapTransformer':
-                    if not batch.shape[0] == 6:
+                    if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
                     
