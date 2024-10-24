@@ -6,7 +6,7 @@ import json
 import numpy as np
 from tqdm import tqdm
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from config.train_config_server import get_config
+from config.train_config import get_config
 from utils.data_loaders.gm.gm_dataset import load_poses_from_txt, load_timestamps
 cfg = get_config()
 

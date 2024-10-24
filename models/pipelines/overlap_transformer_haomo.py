@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from modules.netvlad import NetVLADLoupe
+from aggregators.netvlad import NetVLADLoupe
 import torch.nn.functional as F
 
 

@@ -68,13 +68,12 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
         Dataset = dataset_str_mapping[config.dataset]
 
     elif phase in ['test']:
-        use_random_rotation = config.use_random_rotation
-        use_random_occlusion = config.use_random_scale
+        # use_random_rotation = config.use_random_rotation
+        # use_random_occlusion = config.use_random_scale
         try:
             Dataset = dataset_str_mapping[config.eval_dataset]
         except:
             Dataset = dataset_str_mapping[config.dataset]
-        
 
     dset = Dataset(phase,
                    random_scale=use_random_scale,

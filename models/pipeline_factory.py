@@ -3,10 +3,10 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 from pipelines.PointNetVLAD import *
 from pipelines.LOGG3D import *
-from modules.overlap_transformer import *
-from modules.overlap_transformer_resnet import *
-from modules.overlap_transformer_ViT import *
-from modules.overlap_transformer_geo import *
+from pipelines.overlap_transformer import *
+from pipelines.overlap_transformer_resnet import *
+from pipelines.overlap_transformer_ViT import *
+from pipelines.overlap_transformer_geo import *
 
 
 def get_pipeline(cfg):

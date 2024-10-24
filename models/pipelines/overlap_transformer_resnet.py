@@ -14,7 +14,7 @@ sys.path.append('../tools/')
 import torch
 import torch.nn as nn
 
-from modules.netvlad import NetVLADLoupe
+from aggregators.netvlad import NetVLADLoupe
 import torch.nn.functional as F
 # from tools.read_samples import read_one_need_from_seq
 import yaml

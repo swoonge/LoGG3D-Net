@@ -9,6 +9,7 @@
 *.yml
 *.pth
 *.tar
+*.pkl
 
 log*
 __pycache__

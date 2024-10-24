@@ -1,23 +1,19 @@
 import argparse
-
 arg_lists = []
 parser = argparse.ArgumentParser()
-
 
 def add_argument_group(name):
     arg = parser.add_argument_group(name)
     arg_lists.append(arg)
     return arg
 
-
 def str2bool(v):
     return v.lower() in ('true', '1')
-
 
 # Training
 trainer_arg = add_argument_group('Train')
 # LOGG3D, OverlapTransformer, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo
-trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer')
+trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_geo')
 trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
@@ -49,7 +45,7 @@ trainer_arg.add_argument('--scene_loss_weight', type=float, default=1.0)  # 0.1
 # Optimizer arguments
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
-opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
+opt_arg.add_argument('--max_epoch', type=int, default=200)  # 20
 opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 #cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
@@ -60,7 +56,7 @@ opt_arg.add_argument('--scheduler', type=str,
 data_arg = add_argument_group('Data')
 # KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='GMRangeImageTupleDataset')
+                      default='KittiRangeImageTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -80,9 +76,9 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 3, 5, 6, 7, 8, 9, 10],
+    'train': [0, 1, 3, 5, 6, 7, 9, 10],
     'val': [2],
-    'test': [0]
+    'test': [8]
 })
 
 data_arg.add_argument('--mulran_dir', type=str,
@@ -116,9 +112,9 @@ data_arg.add_argument('--gm_20m_json', type=str,
 data_arg.add_argument('--gm_seq_lens', type=dict, default={
     "0": 4150, "1": 6283, "2": 5340,"3": 5410})
 data_arg.add_argument('--gm_data_split', type=dict, default={
-    'train': [0, 1, 3],
-    'val': [2],
-    'test': [2]
+    'train': [0, 1, 2],
+    'val': [3],
+    'test': [3]
 })
 
 # Data loader configs
@@ -131,7 +127,7 @@ data_arg.add_argument('--gp_vals', type=dict, default={
 })
 data_arg.add_argument('--val_phase', type=str, default="val")
 data_arg.add_argument('--test_phase', type=str, default="test")
-data_arg.add_argument('--use_random_rotation', type=str2bool, default=False)
+data_arg.add_argument('--use_random_rotation', type=str2bool, default=True)
 data_arg.add_argument('--rotation_range', type=float, default=360)
 data_arg.add_argument('--use_random_occlusion', type=str2bool, default=False)
 data_arg.add_argument('--occlusion_angle', type=float, default=30)
@@ -142,7 +138,7 @@ data_arg.add_argument('--max_scale', type=float, default=1.0)
 # Misc
 misc_arg = add_argument_group('Misc')
 # misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default_val')  ##############
-misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer')  ##############
+misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_geo')  ##############
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)

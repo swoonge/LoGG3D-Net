@@ -14,7 +14,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
-from config.train_config_server import get_config
+from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
 
@@ -24,7 +24,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
-    model_save_path = os.path.join(os.path.join(os.path.dirname(__file__), 'checkpoints'), cfg.pipeline, f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}")
+    model_save_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'checkpoints', cfg.pipeline, f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}")
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
     writer_save_path = os.path.join(model_save_path)
@@ -119,7 +119,7 @@ def main():
                 loss = scene_loss
 
             elif cfg.pipeline.split('_')[0] == 'OverlapTransformer':
-                if not batch.shape[0] == 6:
+                if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
                 
@@ -152,7 +152,6 @@ def main():
         metric_epoch_loss = metric_epoch_loss / len(train_loader)
         scheduler.step(metric_epoch_loss)
 
-        print("Validation")
         logger.info('**** Validation %03d ****' % (epoch))
         model.eval()
         with torch.no_grad():
@@ -183,7 +182,7 @@ def main():
                     loss = scene_loss
 
                 elif cfg.pipeline.split('_')[0] == 'OverlapTransformer':
-                    if not batch.shape[0] == 6:
+                    if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
                     

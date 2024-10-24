@@ -13,15 +13,11 @@ sys.path.append('../tools/')
 import torch
 import torch.nn as nn
 
-from modules.netvlad import NetVLADLoupe
+from aggregators.netvlad import NetVLADLoupe
 import torch.nn.functional as F
 # from tools.read_samples import read_one_need_from_seq
 import yaml
 import numpy as np
-import torch.nn
-# from GeoTransformer.geotransformer.modules.transformer import RPEConditionalTransformer, SinusoidalPositionalEmbedding
-
-import torch
 
 @torch.no_grad()
 def compute_cosine_similarity_matrix(tensor, eps=1e-8):
@@ -39,43 +35,44 @@ def compute_cosine_similarity_matrix(tensor, eps=1e-8):
 def compute_l2distance_matrix(tensor, eps=1e-8):
     # tensor: (batch_size, num_queries, feature_dim)
     
-    # 각 벡터의 제곱합을 계산: (batch_size, num_queries, 1)
-    tensor_sq = (tensor ** 2).sum(dim=-1, keepdim=True)
+    # (batch_size, num_queries, 1, feature_dim)로 확장하여 L2 거리 계산
+    tensor_1 = tensor.unsqueeze(2)
+    tensor_2 = tensor.unsqueeze(1)
     
-    # 두 벡터의 제곱합 차이를 계산
-    # A^2 + B^2 - 2AB 공식을 사용
-    distances = tensor_sq + tensor_sq.transpose(1, 2) - 2 * torch.bmm(tensor, tensor.transpose(1, 2))
+    # (batch_size, num_queries, num_queries)에서 L2 거리 계산
+    l2_distance_matrix = torch.norm(tensor_1 - tensor_2, dim=-1)
+
+    # 수치적 안정성을 위한 epsilon 추가
+    l2_distance_matrix = l2_distance_matrix + eps
     
-    # eps로 수치 안정성을 위한 최소값 처리
-    distance_matrix = torch.clamp(distances, min=eps)
-    
-    return distance_matrix
+    return l2_distance_matrix
 
 class LearnablePositionalEncoding(nn.Module):
     def __init__(self, seq_len, d_model):
         super(LearnablePositionalEncoding, self).__init__()
-        # 포지션을 위한 임베딩 레이어
+        # 포지션을 위한 학습 가능한 임베딩 레이어
         self.position_embedding = nn.Embedding(seq_len, d_model)
 
     def forward(self, x):
-        # 입력 x의 형태: (batch_size, d_model, q_num) [6, 256, 900]
-        x = x.permute(0, 2, 1)
-        batch_size, seq_len, _ = x.size() # [6, 900, 256]
+        # 입력 x의 형태: (batch_size, d_model, seq_len) -> [6, 256, 900]
+        x = x.permute(0, 2, 1)  # (batch_size, seq_len, d_model) -> [6, 900, 256]
+        batch_size, seq_len, _ = x.size()  # [6, 900, 256]
 
-        # 포지션 인덱스 생성
-        # position_ids = torch.arange(seq_len, device=x.device).unsqueeze(0).expand(batch_size, seq_len) # [6, 900]
-        position_ids = self.angle_position(x) # [6, 900]
-        
-        # 포지셔널 임베딩 생성 및 추가
-        position_embeddings = self.position_embedding(position_ids) # [6, 900, 256]
-        x + position_embeddings
-    
-        return x.permute(0, 2, 1)
+        # 각도 기반 포지션 인덱스 생성
+        position_ids = self.angle_position(x)  # [6, 900]
+
+        # 포지셔널 임베딩 생성
+        position_embeddings = self.position_embedding(position_ids)  # [6, 900, 256]
+
+        # 입력 데이터와 포지셔널 임베딩 더하기
+        x = x + position_embeddings  # [6, 900, 256]
+
+        # 원래 형태로 복원 (batch_size, d_model, seq_len)
+        return x.permute(0, 2, 1)  # [6, 256, 900]
 
     @torch.no_grad()
     def angle_position(self, tensor):
         # tensor: (batch_size, num_queries, feature_dim)
-        # print(tensor.size())
         batch_size, num_queries, feature_dim = tensor.shape
         
         # 코사인 유사도 계산: (batch_size, num_queries, num_queries)
@@ -91,11 +88,8 @@ class LearnablePositionalEncoding(nn.Module):
         # 현재 인덱스와 most_similar_indices 간의 각도 차이 계산
         current_indices = torch.arange(num_queries, device=tensor.device).unsqueeze(0)  # (1, num_queries)
         angles = torch.abs(current_indices - most_similar_indices)  # (batch_size, num_queries)
-        # angles = torch.min(angles, num_queries - angles) * (2 * torch.pi / num_queries)  # (batch_size, num_queries)
-
-        return angles
-
-
+        return angles  # [batch_size, num_queries]
+    
 
 class OverlapTransformer_geo(nn.Module):
     def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer = True):
@@ -135,7 +129,7 @@ class OverlapTransformer_geo(nn.Module):
         """
         self.learnable_pos_enc = LearnablePositionalEncoding(900, 256)
         encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.1)
-        self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
 
         self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast1 = norm_layer(256)

@@ -28,13 +28,13 @@ from utils.data_loaders.kitti.kitti_rangeimage_dataset import load_timestamps
 # # ============================================================================
 
 class Evaluator:
-    def __init__(self, args, seq) -> None:
+    def __init__(self, args, seq, threshold) -> None:
         self.args = args
         self.sequence = f"{seq:02d}"
         
         self.pose_threshold = [3.0, 20.0]  # 실제 pose 거리 임계값 3m, 20m
-        self.thresholds = np.linspace(0.001, 0.8, 500)
-        self.thresholds_num = len(self.thresholds)
+        self.thresholds = [threshold]
+        self.thresholds_num = 1
         self.descriptors = []
         self.data = []
 
@@ -75,10 +75,7 @@ class Evaluator:
             return
         matching_results = self.find_matching_poses()
 
-        metrics_list = []
-        for th_idx in range(self.thresholds_num):
-            metrics_list.append(self.calculate_metrics(matching_results[th_idx], top_k=5))
-        return metrics_list
+        return matching_results[0]
     
     def calculate_pose_distance(self, pose1, pose2):
         translation1 = pose1[:3, 3]
@@ -158,57 +155,10 @@ class Evaluator:
         
         return matching_results_list
 
-    def calculate_metrics(self, matching_results, top_k=5):
-        tp = 0  # True Positives
-        tn = 0  # True Negatives
-        fp = 0  # False Positives
-        fn = 0  # False Negatives
-        total_attempts = len(matching_results)
-        
-        topk_tp = 0  # Top-K Recall 계산을 위한 변수
-        
-        for matches in matching_results:
-            first_match = matches[0]  # 첫 번째 매칭 (top-1) 결과
-            
-            if first_match[4] == "tp":
-                tp += 1
-            elif first_match[4] == "tn":
-                tn += 1
-            elif first_match[4] == "fp":
-                fp += 1
-            elif first_match[4] == "fn":
-                fn += 1
-            
-            # Top-K Recall 계산 (상위 K개의 매칭에서 적어도 하나가 True Positive일 경우 성공으로 간주)
-            if any(match[4] == "tp" for match in matches[:top_k]):
-                topk_tp += 1
-        
-        # 메트릭 계산
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        accuracy = (tp + tn) / total_attempts if total_attempts > 0 else 0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
-        
-        topk_recall = topk_tp / (topk_tp + fn) if (topk_tp + fn) > 0 else 0
-        
-        return {
-            "True Positives": tp,
-            "True Negatives": tn,
-            "False Positives": fp,
-            "False Negatives": fn,
-            "Precision": precision,
-            "Recall (TPR)": recall,
-            "F1-Score": f1_score,
-            "Accuracy": accuracy,
-            "False Positive Rate (FPR)": fpr,
-            "Top-{} Recall".format(top_k): topk_recall
-        }
-
 @torch.no_grad()
-def __main__(args, model, device, model_name, train_name, file_name):
+def __main__(args, model, device, model_name, train_name, file_name, threshold):
     print("===test for kitti sequence {}===".format(args.kitti_data_split['test'][0]))
-    evaluator = Evaluator(args, args.kitti_data_split['test'][0])
+    evaluator = Evaluator(args, args.kitti_data_split['test'][0], threshold)
 
     load_descriptors_flag = False
     if load_descriptors_flag == False:
@@ -247,82 +197,63 @@ def __main__(args, model, device, model_name, train_name, file_name):
         print("=================================")
         
     print("Evaluating ...")
-    metrics = evaluator.evaluate()
-
-    f1_scores = [result["F1-Score"] for result in metrics]
-    max_f1_index = f1_scores.index(max(f1_scores))
-    best_metrics = metrics[max_f1_index]
-    
-    print("===== Evaluation Results =====")
-    print("Best F1-Score: {:.3f} at thresholds {:.3f}".format(max(f1_scores), evaluator.thresholds[max_f1_index]))
-    print("Matching Metrics :")
-    for key, value in best_metrics.items():
-        print(f"{key}: {value:.3f}")
-    print("=================================")
+    matching_results = evaluator.evaluate()
 
     import pickle
     
-    save_folder_path = os.path.join(os.path.dirname(__file__), 'results', model_name, train_name)
+    save_folder_path = os.path.join(os.path.dirname(__file__), 'matching_results', model_name, train_name)
     if not os.path.exists(save_folder_path):
         os.makedirs(save_folder_path)
     with open(os.path.join(save_folder_path, file_name + '.pkl'), 'wb') as file:
-        pickle.dump(metrics, file)
+        pickle.dump(matching_results, file)
     print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
 
 
 if __name__ == '__main__':
-    from config.eval_config_new import get_config_eval
     from models.pipeline_factory import get_pipeline
 
     test_models_list = [
-        # ['OverlapTransformer/2024-10-14_04-48-23',['epoch_best_50.pth', 'epoch_best_71.pth']], # triplet lazy False 00
-        # ['OverlapTransformer/2024-10-14_04-48-04',['epoch_best_50.pth', 'epoch_best_71.pth']], # triplet lazy True 00
-        # ['OverlapTransformer/2024-10-14_04-31-11',['epoch_best_50.pth', 'epoch_best_71.pth']], # quadruplet lazy True 00
-        # ['OverlapTransformer/2024-10-10_14-06-46',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 step2
-        # ['OverlapTransformer/2024-10-11_00-46-31',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 ReduceLROnPlateau
-        # ['OverlapTransformer/2024-10-10_14-07-02',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 step2
-        # ['OverlapTransformer/2024-10-10_15-48-19',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 ReduceLROnPlateau
-        # ['OverlapTransformer/2024-10-10_14-06-02',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 step2
-        # ['OverlapTransformer/2024-10-10_15-48-11',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 ReduceLROnPlateau
-        # ['OverlapTransformer_geo/2024-10-11_09-30-16',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 geo
-        # ['OverlapTransformer_geo/2024-10-11_09-30-40',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 geo
-        # ['OverlapTransformer_geo/2024-10-12_07-52-41',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 geo
-        # ['OverlapTransformer_resnet/2024-10-11_09-33-09',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 resnet
-        # ['OverlapTransformer_resnet/2024-10-11_09-33-26',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 resnet
-        # ['OverlapTransformer_resnet/2024-10-12_07-18-40',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 resnet
-        # ['OverlapTransformer_geo/2024-10-20_20-25-51',['epoch_best_34.pth']]
-        # ['OverlapTransformer/original',['epoch_best_34.pth']]
-        
-
-
-        # ['OverlapTransformer/2024-10-12_19-23-47',['epoch_best_80.pth', 'epoch_93.pth']],
-        # ['OverlapTransformer_geo/2024-10-12_07-52-41',['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth', 'epoch_54.pth', 'epoch_72.pth']]
+        ['OverlapTransformer/2024-10-10_14-06-46', 'epoch_82', 0.457343],
+        ['OverlapTransformer/2024-10-11_00-46-31', 'epoch_best_71', 0.492569],
+        ['OverlapTransformer/2024-10-14_04-48-23', 'epoch_best_76', 0.486164],
+        ['OverlapTransformer/2024-10-14_04-48-04', 'epoch_best_71', 0.500575],
+        ['OverlapTransformer/2024-10-14_04-31-11', 'epoch_best_44', 0.434926],
+        ['OverlapTransformer_resnet/2024-10-11_09-33-09', 'epoch_44', 0.383687],
+        ['OverlapTransformer_geo/2024-10-11_09-30-16', 'epoch_84', 0.474956],
+        ['OverlapTransformer/2024-10-10_14-07-02', 'epoch_best_92', 0.418914],
+        ['OverlapTransformer/2024-10-10_15-48-19', 'epoch_best_34', 0.386890],
+        ['OverlapTransformer_resnet/2024-10-11_09-33-26', 'epoch_best_67', 0.367675],
+        ['OverlapTransformer_geo/2024-10-11_09-30-40', 'epoch_91', 0.508581],
+        ['OverlapTransformer/2024-10-10_14-06-02', 'epoch_best_42', 0.412509],
+        ['OverlapTransformer/2024-10-10_15-48-11', 'epoch_best_64', 0.473355],
+        ['OverlapTransformer_resnet/2024-10-12_07-18-40', 'epoch_best_24', 0.329246],
+        ['OverlapTransformer_geo/2024-10-12_07-52-41', 'epoch_best_70', 0.490968],
     ]
     for model_name in test_models_list:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
         model_path = model_name[0]
-        # file_list = model_name[1]
-        file_list = [os.path.basename(f) for f in glob.glob(os.path.join('../training/checkpoints', model_path, '*.pth'))]
+        file = model_name[1] + '.pth'
+        threshold = model_name[2]
+        # file_list = [os.path.basename(f) for f in glob.glob(os.path.join('../training/checkpoints', model_path, '*.pth'))]
         
-        
-        for file in file_list:
-            file_name =  os.path.splitext(os.path.basename(file))[0]
-            model_name = model_path.split('/')[0]
-            train_name = model_path.split('/')[1]
- 
-            ## load checkpoint
-            print('Loading checkpoint from: ', os.path.join('../training/checkpoints', model_path, file))
-            checkpoint = torch.load(os.path.join('../training/checkpoints', model_path, file))
-            args = checkpoint['config']
-            args.kitti_dir = '/media/vision/Data0/DataSets/kitti/dataset/'
-            if len(args.kitti_data_split['test']) == 0:
-                args.kitti_data_split['test'] = [5]
+        # for file in file_list:
+        file_name =  os.path.splitext(os.path.basename(file))[0]
+        model_name = model_path.split('/')[0]
+        train_name = model_path.split('/')[1]
 
-            ## load model
-            model = get_pipeline(args).to(device)
-            model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
-            model.eval()
+        ## load checkpoint
+        print('Loading checkpoint from: ', os.path.join('../training/checkpoints', model_path, file))
+        checkpoint = torch.load(os.path.join('../training/checkpoints', model_path, file))
+        args = checkpoint['config']
+        args.kitti_dir = '/media/vision/Data0/DataSets/kitti/dataset/'
+        if len(args.kitti_data_split['test']) == 0:
+            args.kitti_data_split['test'] = [5]
 
-            __main__(args, model, device, model_name, train_name, file_name)
+        ## load model
+        model = get_pipeline(args).to(device)
+        model.load_state_dict(checkpoint['model_state_dict']) # state_dict, model_state_dict
+        model.eval()
+
+        __main__(args, model, device, model_name, train_name, file_name, threshold)

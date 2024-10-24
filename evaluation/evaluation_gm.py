@@ -19,7 +19,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve
 from scipy.spatial.distance import pdist, squareform
 from utils.data_loaders.make_dataloader import *
 from models.pipelines.pipeline_utils import *
-from utils.data_loaders.kitti.kitti_rangeimage_dataset import load_timestamps
+from utils.data_loaders.gm.gm_rangeimage_dataset import load_timestamps
 
 # # load config ================================================================
 # config_filename = '../config/config.yml'
@@ -32,33 +32,21 @@ class Evaluator:
         self.args = args
         self.sequence = f"{seq:02d}"
         
-        self.pose_threshold = [3.0, 20.0]  # 실제 pose 거리 임계값 3m, 20m
+        self.pose_threshold = [2.0, 10.0]  # 실제 pose 거리 임계값 3m, 20m
         self.thresholds = np.linspace(0.001, 0.8, 500)
         self.thresholds_num = len(self.thresholds)
         self.descriptors = []
         self.data = []
 
-        self.dataset_path = os.path.join(args.kitti_dir, 'sequences', self.sequence)
-        self.load_kitti_poses_and_timestamps()
+        self.dataset_path = os.path.join(args.gm_dir, self.sequence)
+        self.load_gm_poses_and_timestamps()
 
-    def load_kitti_poses_and_timestamps(self):
+    def load_gm_poses_and_timestamps(self):
         self.timestamps = np.array(load_timestamps(self.dataset_path + '/times.txt'))
-
-        # load calibrations
-        calib_file = os.path.join(self.dataset_path, 'calib.txt')
-        T_cam_velo = load_calib(calib_file)
-        T_cam_velo = np.asarray(T_cam_velo).reshape((4, 4))
-        T_velo_cam = np.linalg.inv(T_cam_velo)
 
         # load poses
         poses_file = os.path.join(self.dataset_path, 'poses.txt')
-        poses = load_poses(poses_file)
-        pose0_inv = np.linalg.inv(poses[0])
-
-        poses_new = []
-        for pose in poses:
-            poses_new.append(T_velo_cam.dot(pose0_inv).dot(pose).dot(T_cam_velo))
-        self.poses = np.array(poses_new)
+        self.poses = np.array(load_poses(poses_file))
 
     def put_descriptor(self, descriptor):
         if len(self.descriptors) < len(self.poses):
@@ -78,7 +66,7 @@ class Evaluator:
         metrics_list = []
         for th_idx in range(self.thresholds_num):
             metrics_list.append(self.calculate_metrics(matching_results[th_idx], top_k=5))
-        return metrics_list
+        return metrics_list, matching_results
     
     def calculate_pose_distance(self, pose1, pose2):
         translation1 = pose1[:3, 3]
@@ -207,8 +195,8 @@ class Evaluator:
 
 @torch.no_grad()
 def __main__(args, model, device, model_name, train_name, file_name):
-    print("===test for kitti sequence {}===".format(args.kitti_data_split['test'][0]))
-    evaluator = Evaluator(args, args.kitti_data_split['test'][0])
+    print("===test for gm sequence {}===".format(args.gm_data_split['test'][0]))
+    evaluator = Evaluator(args, args.gm_data_split['test'][0])
 
     load_descriptors_flag = False
     if load_descriptors_flag == False:
@@ -247,7 +235,7 @@ def __main__(args, model, device, model_name, train_name, file_name):
         print("=================================")
         
     print("Evaluating ...")
-    metrics = evaluator.evaluate()
+    metrics, matching_results = evaluator.evaluate()
 
     f1_scores = [result["F1-Score"] for result in metrics]
     max_f1_index = f1_scores.index(max(f1_scores))
@@ -269,43 +257,32 @@ def __main__(args, model, device, model_name, train_name, file_name):
         pickle.dump(metrics, file)
     print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
 
+    save_folder_path = os.path.join(os.path.dirname(__file__), 'matching_results', model_name, train_name)
+    if not os.path.exists(save_folder_path):
+        os.makedirs(save_folder_path)
+    with open(os.path.join(save_folder_path, file_name + '.pkl'), 'wb') as file:
+        pickle.dump(matching_results, file)
+    print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
+
 
 if __name__ == '__main__':
     from config.eval_config_new import get_config_eval
     from models.pipeline_factory import get_pipeline
 
     test_models_list = [
-        # ['OverlapTransformer/2024-10-14_04-48-23',['epoch_best_50.pth', 'epoch_best_71.pth']], # triplet lazy False 00
-        # ['OverlapTransformer/2024-10-14_04-48-04',['epoch_best_50.pth', 'epoch_best_71.pth']], # triplet lazy True 00
-        # ['OverlapTransformer/2024-10-14_04-31-11',['epoch_best_50.pth', 'epoch_best_71.pth']], # quadruplet lazy True 00
-        # ['OverlapTransformer/2024-10-10_14-06-46',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 step2
-        # ['OverlapTransformer/2024-10-11_00-46-31',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 ReduceLROnPlateau
-        # ['OverlapTransformer/2024-10-10_14-07-02',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 step2
-        # ['OverlapTransformer/2024-10-10_15-48-19',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 ReduceLROnPlateau
-        # ['OverlapTransformer/2024-10-10_14-06-02',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 step2
-        # ['OverlapTransformer/2024-10-10_15-48-11',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 ReduceLROnPlateau
-        # ['OverlapTransformer_geo/2024-10-11_09-30-16',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 geo
-        # ['OverlapTransformer_geo/2024-10-11_09-30-40',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 geo
-        # ['OverlapTransformer_geo/2024-10-12_07-52-41',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 geo
-        # ['OverlapTransformer_resnet/2024-10-11_09-33-09',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti00 resnet
-        # ['OverlapTransformer_resnet/2024-10-11_09-33-26',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti05 resnet
-        # ['OverlapTransformer_resnet/2024-10-12_07-18-40',['epoch_best_50.pth', 'epoch_best_71.pth']], # kitti08 resnet
-        # ['OverlapTransformer_geo/2024-10-20_20-25-51',['epoch_best_34.pth']]
-        # ['OverlapTransformer/original',['epoch_best_34.pth']]
-        
-
-
-        # ['OverlapTransformer/2024-10-12_19-23-47',['epoch_best_80.pth', 'epoch_93.pth']],
-        # ['OverlapTransformer_geo/2024-10-12_07-52-41',['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth', 'epoch_54.pth', 'epoch_72.pth']]
+        # ['OverlapTransformer/2024-10-12_08-41-37',['epoch_best_66.pth']], # kitti00 geo
+        # ['OverlapTransformer/2024-10-12_19-23-47',['epoch_best_80.pth']], # kitti05 geo
+        ['OverlapTransformer/2024-10-14_16-40-13',['epoch_66.pth']], # kitti08 geo
+        # ['OverlapTransformer/2024-10-14_07-42-01',['epoch_best_23.pth']], # kitti08 geo
+        # ['OverlapTransformer_geo/2024-10-21_01-45-43',['epoch_best_95.pth', 'epoch_147.pth']] #gm 3
     ]
     for model_name in test_models_list:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
         model_path = model_name[0]
-        # file_list = model_name[1]
-        file_list = [os.path.basename(f) for f in glob.glob(os.path.join('../training/checkpoints', model_path, '*.pth'))]
-        
+        file_list = model_name[1]
+        # file_list = [os.path.basename(f) for f in glob.glob(os.path.join('../training/checkpoints', model_path, '*.pth'))]
         
         for file in file_list:
             file_name =  os.path.splitext(os.path.basename(file))[0]
@@ -316,9 +293,7 @@ if __name__ == '__main__':
             print('Loading checkpoint from: ', os.path.join('../training/checkpoints', model_path, file))
             checkpoint = torch.load(os.path.join('../training/checkpoints', model_path, file))
             args = checkpoint['config']
-            args.kitti_dir = '/media/vision/Data0/DataSets/kitti/dataset/'
-            if len(args.kitti_data_split['test']) == 0:
-                args.kitti_data_split['test'] = [5]
+            args.gm_dir = '/media/vision/Data0/DataSets/gm_datasets'
 
             ## load model
             model = get_pipeline(args).to(device)
