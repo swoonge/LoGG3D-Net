@@ -1,11 +1,10 @@
-import os
-import sys
+import os, sys
 p = os.path.dirname(os.path.dirname((os.path.abspath(__file__))))
-if p not in sys.path:
-    sys.path.append(p)
-    
+if p not in sys.path: sys.path.append(p)
+
 import torch
 import torch.nn as nn
+import numpy as np
 import torch.nn.functional as F
 import math
 
@@ -22,7 +21,6 @@ class NetVLADLoupe(nn.Module):
         self.add_batch_norm = add_batch_norm
         self.cluster_size = cluster_size
         self.softmax = nn.Softmax(dim=-1)
-
         self.cluster_weights = nn.Parameter(torch.randn(
             feature_size, cluster_size) * 1 / math.sqrt(feature_size))
         self.cluster_weights2 = nn.Parameter(torch.randn(
@@ -69,13 +67,12 @@ class NetVLADLoupe(nn.Module):
         vlad = vlad - a
 
         vlad = F.normalize(vlad, dim=1, p=2)
-        # vlad = vlad.view((-1, self.cluster_size * self.feature_size))
         vlad = vlad.reshape((-1, self.cluster_size * self.feature_size))
         vlad = F.normalize(vlad, dim=1, p=2)
 
         vlad = torch.matmul(vlad, self.hidden1_weights)
 
-        # vlad = self.bn2(vlad)
+        vlad = self.bn2(vlad) # batch normalization. not used in LoGG3D, used in OverlapTransformer
 
         if self.gating:
             vlad = self.context_gating(vlad)
@@ -113,43 +110,40 @@ class GatingContext(nn.Module):
         activation = x * gates
 
         return activation
+    
+    if __name__ == '__main__':
+        net_vlad = NetVLADLoupe(feature_size=1024, max_samples=360, cluster_size=16,
+                                    output_dim=20, gating=True, add_batch_norm=True,
+                                    is_training=True)
+        # input  (bs, 1024, 360, 1)
+        torch.manual_seed(1234)
+        input_tensor = F.normalize(torch.randn((1,1024,360,1)), dim=1)
+        input_tensor2 = torch.zeros_like(input_tensor)
+        input_tensor2[:, :, 2:, :] = input_tensor[:, :, 0:-2, :].clone()
+        input_tensor2[:, :, :2, :]  = input_tensor[:, :, -2:, :].clone()
+        input_tensor2= F.normalize(input_tensor2, dim=1)
+        input_tensor_com = torch.cat((input_tensor, input_tensor2), dim=0)
+
+        # print(input_tensor[0,0,:,0])
+        # print(input_tensor2[0,0,:,0])
+        print("==================================")
+
+        with torch.no_grad():
+            net_vlad.eval()
+            # output_tensor = net_vlad(input_tensor_com)
+            # print(output_tensor)
+            out1 = net_vlad(input_tensor)
+            print(out1)
+            net_vlad.eval()
+            # input_tensor2[:, :, 20:, :] = 0.1
+            input_tensor2 = F.normalize(input_tensor2, dim=1)
+            out2 = net_vlad(input_tensor2)
+            print(out2)
+            net_vlad.eval()
+            input_tensor3 = torch.randn((1,1024,360,1))
+            out3 = net_vlad(input_tensor3)
+            print(out3)
 
 
-if __name__ == '__main__':
-    net_vlad = NetVLADLoupe(feature_size=1024, max_samples=360, cluster_size=16,
-                                 output_dim=20, gating=True, add_batch_norm=True,
-                                 is_training=True)
-    # input  (bs, 1024, 360, 1)
-    torch.manual_seed(1234)
-    input_tensor = F.normalize(torch.randn((1,1024,360,1)), dim=1)
-    input_tensor2 = torch.zeros_like(input_tensor)
-    input_tensor2[:, :, 2:, :] = input_tensor[:, :, 0:-2, :].clone()
-    input_tensor2[:, :, :2, :]  = input_tensor[:, :, -2:, :].clone()
-    input_tensor2= F.normalize(input_tensor2, dim=1)
-    input_tensor_com = torch.cat((input_tensor, input_tensor2), dim=0)
-
-    # print(input_tensor[0,0,:,0])
-    # print(input_tensor2[0,0,:,0])
-    print("==================================")
-
-    with torch.no_grad():
-        net_vlad.eval()
-        # output_tensor = net_vlad(input_tensor_com)
-        # print(output_tensor)
-        out1 = net_vlad(input_tensor)
-        print(out1)
-        net_vlad.eval()
-        # input_tensor2[:, :, 20:, :] = 0.1
-        input_tensor2 = F.normalize(input_tensor2, dim=1)
-        out2 = net_vlad(input_tensor2)
-        print(out2)
-        net_vlad.eval()
-        input_tensor3 = torch.randn((1,1024,360,1))
-        out3 = net_vlad(input_tensor3)
-        print(out3)
-
-
-        print(((out1-out2)**2).sum(1))
-        print(((out1-out3)**2).sum(1))
-
-
+            print(((out1-out2)**2).sum(1))
+            print(((out1-out3)**2).sum(1))
