@@ -257,12 +257,12 @@ def __main__(args, model, device, model_name, train_name, file_name):
         pickle.dump(metrics, file)
     print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
 
-    save_folder_path = os.path.join(os.path.dirname(__file__), 'matching_results', model_name, train_name)
-    if not os.path.exists(save_folder_path):
-        os.makedirs(save_folder_path)
-    with open(os.path.join(save_folder_path, file_name + '.pkl'), 'wb') as file:
-        pickle.dump(matching_results, file)
-    print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
+    # save_folder_path = os.path.join(os.path.dirname(__file__), 'matching_results', model_name, train_name)
+    # if not os.path.exists(save_folder_path):
+    #     os.makedirs(save_folder_path)
+    # with open(os.path.join(save_folder_path, file_name + '.pkl'), 'wb') as file:
+    #     pickle.dump(matching_results, file)
+    # print("Results saved at: ", os.path.join(save_folder_path, file_name + '.pkl'))
 
 
 if __name__ == '__main__':

@@ -7,7 +7,44 @@ import os
 import math
 import numpy as np
 import time
+import torch
 
+class Timer_for_torch:
+    def __init__(self):
+        self.start_times = []
+        self.total_time = 0.0
+        self.num_measurements = 0
+
+    def tic(self):
+        # CUDA 동기화 (GPU에서 정확한 시간 측정을 위해)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        self.start_times.append(time.time())
+
+    def toc(self):
+        # CUDA 동기화 (측정 끝에도 정확한 시간 기록을 위해)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+
+        if not self.start_times:
+            raise ValueError("tic() must be called before toc()")
+
+        # 시간 계산
+        start_time = self.start_times.pop()
+        elapsed_time = time.time() - start_time
+        self.total_time += elapsed_time
+        self.num_measurements += 1
+        return elapsed_time
+
+    def average_time(self):
+        if self.num_measurements == 0:
+            return 0.0
+        return self.total_time / self.num_measurements
+
+    def reset(self):
+        self.start_times = []
+        self.total_time = 0.0
+        self.num_measurements = 0
 
 def load_poses(pose_path):
   """ Load ground truth poses (T_w_cam0) from file.

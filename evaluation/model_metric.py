@@ -1,3 +1,8 @@
+## 네트워크 모델에 대한 성능 측정을 위한 코드
+## 1. 모델의 파라미터 수 계산
+## 2. 모델의 처리 시간 측정
+## 3. 메모리 사용량 측정
+
 import os, sys, logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 ch = logging.StreamHandler(sys.stdout)
@@ -7,6 +12,8 @@ logging.basicConfig(format='%(asctime)s %(message)s',
                     handlers=[ch])
 logging.basicConfig(level=logging.INFO, format="")
 
+from tools.utils.utils import Timer_for_torch as Timer
+
 from tqdm import tqdm
 
 import torch
@@ -14,47 +21,9 @@ from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
 from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
-import time
 torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
 cfg = get_config()
-
-class Timer:
-    def __init__(self):
-        self.start_times = []
-        self.total_time = 0.0
-        self.num_measurements = 0
-
-    def tic(self):
-        # CUDA 동기화 (GPU에서 정확한 시간 측정을 위해)
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        self.start_times.append(time.time())
-
-    def toc(self):
-        # CUDA 동기화 (측정 끝에도 정확한 시간 기록을 위해)
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-
-        if not self.start_times:
-            raise ValueError("tic() must be called before toc()")
-
-        # 시간 계산
-        start_time = self.start_times.pop()
-        elapsed_time = time.time() - start_time
-        self.total_time += elapsed_time
-        self.num_measurements += 1
-        return elapsed_time
-
-    def average_time(self):
-        if self.num_measurements == 0:
-            return 0.0
-        return self.total_time / self.num_measurements
-
-    def reset(self):
-        self.start_times = []
-        self.total_time = 0.0
-        self.num_measurements = 0
 
 def main():
     torch.manual_seed(42)

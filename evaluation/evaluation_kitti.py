@@ -298,6 +298,7 @@ if __name__ == '__main__':
         # ['OverlapTransformer/2024-10-12_19-23-47',['epoch_best_80.pth', 'epoch_93.pth']],
         # ['OverlapTransformer_geo/2024-10-12_07-52-41',['epoch_best_22.pth', 'epoch_best_24.pth', 'epoch_best_44.pth', 'epoch_best_48.pth', 'epoch_54.pth', 'epoch_72.pth']]
     ]
+    
     for model_name in test_models_list:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
