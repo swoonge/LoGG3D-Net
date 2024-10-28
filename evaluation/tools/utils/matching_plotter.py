@@ -1,8 +1,9 @@
-from utils import *
+import os
+from .utils import *
 import matplotlib.pyplot as plt
 
 class plotter:
-    def __init__(self, dataset, dataset_path=None, seq=None, matching_data=None, save_file_name=None) -> None:
+    def __init__(self, dataset=None, dataset_path=None, seq=None, matching_data=None, save_file_name=None) -> None:
         if dataset_path and seq is not None:
             self.data_setting(dataset, dataset_path, seq, matching_data, save_file_name)
         else:
@@ -17,10 +18,10 @@ class plotter:
             self.dataset_path = os.path.join(dataset_path, '{:02d}'.format(seq))
         else:
             self.dataset = "Unknown"
-        print("****** plot for {} dataset ******".format(save_file_name))
 
         self.matchings = matching_data
         self.save_file_name = save_file_name
+        self.seq = seq
         self.get_poses()
 
     def get_poses(self):
@@ -44,6 +45,8 @@ class plotter:
             self.poses = poses
 
     def plot_total_matching(self, vis=True):
+        print('*' * 50)
+        print(f"* plot {self.save_file_name.split('/')[-2]}'s results for {self.dataset}_{self.seq} dataset")
         # 전체 지도 생성 -> x, y 좌표 추출
         x_map, y_map = zip(*[pose[:2, 3] for pose in self.poses])
 
@@ -77,5 +80,24 @@ class plotter:
         plt.legend(by_label.values(), by_label.keys())
 
         # 이미지 저장 (저장 경로와 파일명을 지정해야 합니다)
-        plt.savefig(self.save_file_name, dpi=900)
-        plt.show() if vis else plt.close()
+        while True:
+            save_image = input("* >> Do you want to save the image? (y/n): ").strip().lower()
+            if save_image == 'y':
+                plt.savefig(self.save_file_name, dpi=900)
+                print(f"* Image saved as {self.save_file_name}")
+                break
+            elif save_image == 'n':
+                break
+            print("* [!] Invalid input. Please enter 'y' or 'n'.")
+        
+        while True:
+            show_image = input("* >> Do you want to display the image? (y/n): ").strip().lower()
+            if show_image == 'y':
+                plt.show()
+                plt.close()
+                break
+            elif show_image == 'n':
+                break
+            print("* [!] Invalid input. Please enter 'y' or 'n'.")
+        print('*' * 50, '\n')
+        
