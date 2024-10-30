@@ -3,25 +3,21 @@ from .utils import *
 import matplotlib.pyplot as plt
 
 class plotter:
-    def __init__(self, dataset=None, dataset_path=None, seq=None, matching_data=None, save_file_name=None) -> None:
-        if dataset_path and seq is not None:
-            self.data_setting(dataset, dataset_path, seq, matching_data, save_file_name)
+    def __init__(self, args=None, matching_data=None, save_file_name=None) -> None:
+        if args is not None:
+            self.data_setting(args, matching_data, save_file_name)
         else:
             pass
         
-    def data_setting(self, dataset, dataset_path, seq, matching_data, save_file_name):
-        if dataset == "kitti":
-            self.dataset = "KITTI"
-            self.dataset_path = os.path.join(dataset_path, 'sequences', '{:02d}'.format(seq))
-        elif dataset == "gm":
-            self.dataset = "GM_Cave"
-            self.dataset_path = os.path.join(dataset_path, '{:02d}'.format(seq))
-        else:
-            self.dataset = "Unknown"
+    def data_setting(self, args, matching_data, save_file_name):
+        self.args = args
+        if self.args.dataset == "kitti":
+            self.dataset_path = os.path.join(self.args.kitti_path, 'sequences', self.args.seq)
+        elif self.args.dataset == "gm":
+            self.dataset_path = os.path.join(self.args.gm_path, self.args.seq)
 
         self.matchings = matching_data
         self.save_file_name = save_file_name
-        self.seq = seq
         self.get_poses()
 
     def get_poses(self):
@@ -29,7 +25,7 @@ class plotter:
         poses_file = os.path.join(self.dataset_path, 'poses.txt')
         poses = load_poses(poses_file)
 
-        if self.dataset == "KITTI":
+        if self.args.dataset == "kitti":
             # load calibrations
             calib_file = os.path.join(self.dataset_path, 'calib.txt')
             T_cam_velo = load_calib(calib_file)
@@ -41,12 +37,12 @@ class plotter:
             for pose in poses:
                 poses_new.append(T_velo_cam.dot(pose0_inv).dot(pose).dot(T_cam_velo))
             self.poses = np.array(poses_new)
-        elif self.dataset == "GM_Cave":
+        elif self.args.dataset == "gm":
             self.poses = poses
 
     def plot_total_matching(self, vis=True):
         print('*' * 50)
-        print(f"* plot {self.save_file_name.split('/')[-2]}'s results for {self.dataset}_{self.seq} dataset")
+        print(f"* plot {self.save_file_name.split('/')[-2]}'s results for {self.args.dataset}_{self.args.seq} dataset")
         # 전체 지도 생성 -> x, y 좌표 추출
         x_map, y_map = zip(*[pose[:2, 3] for pose in self.poses])
 

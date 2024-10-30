@@ -127,7 +127,7 @@ data_arg.add_argument('--gp_vals', type=dict, default={
 })
 data_arg.add_argument('--val_phase', type=str, default="val")
 data_arg.add_argument('--test_phase', type=str, default="test")
-data_arg.add_argument('--use_random_rotation', type=str2bool, default=True)
+data_arg.add_argument('--use_random_rotation', type=str2bool, default=False)
 data_arg.add_argument('--rotation_range', type=float, default=360)
 data_arg.add_argument('--use_random_occlusion', type=str2bool, default=False)
 data_arg.add_argument('--occlusion_angle', type=float, default=30)

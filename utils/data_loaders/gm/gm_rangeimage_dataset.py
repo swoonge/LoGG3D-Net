@@ -305,27 +305,13 @@ def load_poses_from_txt(file_name):
 # Load timestamps
 #####################################################################################
 
-
-def parse_and_compute(value):
-    # 먼저 숫자와 첫 번째 지수를 분리 (예: 4.799437e+04)
-    base_part, remaining = value.split('e', 1)
-    
-    # 첫 번째 지수에서 두 번째 지수를 다시 분리 (예: +04e-03)
-    first_exponent, second_exponent = remaining.split('e')
-
-    # 첫 번째 부분을 처리 (숫자 부분 + 첫 번째 지수 계산)
-    base_value = float(f"{base_part}e{first_exponent}")
-    
-    # 두 번째 지수를 float으로 변환
-    second_exponent_value = float(f"1e{second_exponent}")
-    
-    # 최종 값 계산 (숫자 값에 두 번째 지수를 곱함)
-    return base_value * second_exponent_value
-
 def load_timestamps(file_name):
     # file_name = data_dir + '/times.txt'
     file1 = open(file_name, 'r+')
     stimes_list = file1.readlines()
-    times_list = np.asarray([parse_and_compute(t.strip()) for t in stimes_list])
+    s_exp_list = np.asarray([float(t[-4:-1]) for t in stimes_list])
+    times_list = np.asarray([float(t[:-2]) for t in stimes_list])
+    times_listn = [times_list[t] * (10**(s_exp_list[t]))
+                   for t in range(len(times_list))]
     file1.close()
-    return times_list
+    return times_listn

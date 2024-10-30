@@ -8,6 +8,8 @@ import math
 import numpy as np
 import time
 import torch
+import pandas as pd
+import pickle
 
 class Timer_for_torch:
     def __init__(self):
@@ -279,6 +281,29 @@ def load_files(folder):
   file_paths = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(folder)) for f in fn]
   file_paths.sort()
   return file_paths
+
+
+# 피클 파일들의 데이터를 데이터프레임으로 변환하는 함수
+def load_pickle_and_convert_df(path, pickle_files, threshold_linspace = [0.001, 1.0, 500]):
+    # 피클 파일들의 데이터를 데이터프레임으로 변환
+    dataframes_dict = {}
+
+    for file_name in pickle_files:
+        file_path = os.path.join(path, file_name)  # 피클 파일 경로
+        
+        # 피클 파일 불러오기
+        with open(file_path, 'rb') as file:
+            data = pickle.load(file)
+        
+        # 데이터가 리스트로 구성되어 있는지 확인 후 데이터프레임으로 변환
+        df = pd.DataFrame(data['metrics_list'])
+
+        # expanded_df = pd.json_normalize(df)  # 각 행의 딕셔너리를 개별 컬럼으로 변환
+        thresholds = np.linspace(threshold_linspace[0], threshold_linspace[1], threshold_linspace[2])
+        df.insert(0, 'Thresholds', thresholds[:len(df)])
+        
+        dataframes_dict[file_name.split('.')[0]] = df  # 파일 이름을 키로 데이터프레임 리스트 저장
+    return dataframes_dict
 
 
 semantic_mapping = {  # bgr
