@@ -11,11 +11,13 @@ from utils.data_loaders.kitti.kitti_rangeimage_dataset import *
 # from utils.data_loaders.gm.gm_sparse_dataset import *
 from utils.data_loaders.gm.gm_dataset import *
 from utils.data_loaders.gm.gm_rangeimage_dataset import *
+from utils.data_loaders.kitti.kitti_cvt_dataset import *
 
 
 ALL_DATASETS = [
     KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
-    MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset
+    MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset,
+    KittiCVTDataset, KittiCVTTupleDataset
     
 ]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}

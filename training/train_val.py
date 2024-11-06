@@ -14,6 +14,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
+from utils.tictoc import Timer_for_general
+
 from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
@@ -79,6 +81,12 @@ def main():
      
     best_val_loss = 1000000
 
+    timer_net = Timer_for_general()
+
+    timer_backprop = Timer_for_general()
+
+    timer_total = Timer_for_general()
+
     for epoch in range(starting_epoch, cfg.max_epoch):
         
         lr = optimizer.param_groups[0]['lr']
@@ -94,6 +102,10 @@ def main():
         train_loader_progress_bar = tqdm(train_loader, desc="Training", leave=True)
 
         for i, batch in enumerate(train_loader_progress_bar, 0):
+
+            timer_total.tic()
+            timer_net.tic()
+            
             if i >= len(train_loader):
                 break
             if cfg.pipeline == 'LOGG3D':
@@ -132,9 +144,28 @@ def main():
                 metric_epoch_loss += scene_loss.item()
                 loss = scene_loss
 
+            elif cfg.pipeline.split('_')[0] == 'CVTNet':
+                # print(batch.shape) # [6, 10, 64, 900]
+                if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
+                    print("Batch size is not 6")
+                    continue
+                
+                current_batch = batch.type(torch.FloatTensor).to(device) # [6,1,64,900]
+                # print(current_batch.shape) [6, 10, 64, 900]
+                output = model(current_batch)
+
+                ## loss
+                scene_loss = loss_function(output, cfg)
+                running_scene_loss += scene_loss.item()
+                metric_epoch_loss += scene_loss.item()
+                loss = scene_loss
+            timer_net.toc()
+
+            timer_backprop.tic()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            timer_backprop.toc()
 
             running_loss += loss.item()
             if (i % cfg.loss_log_step) == (cfg.loss_log_step - 1):
@@ -145,12 +176,15 @@ def main():
                 lr = optimizer.param_groups[0]['lr']
                 tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr) + 
                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
+                tqdm.write('Total time{:.4f} Net time{:.4f} Backprop time{:.4f}'.format(timer_total.average_time(), timer_net.average_time(), timer_backprop.average_time()))
                 writer.add_scalar('training loss', avg_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
+            timer_total.toc()
         metric_epoch_loss = metric_epoch_loss / len(train_loader)
         scheduler.step(metric_epoch_loss)
+
 
         logger.info('**** Validation %03d ****' % (epoch))
         model.eval()

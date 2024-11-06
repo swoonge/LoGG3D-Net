@@ -16,17 +16,17 @@ def str2bool(v):
 
 # Evaluation
 eval_arg = add_argument_group('Eval')
-eval_arg.add_argument('--pipeline', type=str, default='LOGG3D')
-eval_arg.add_argument('--kitti_eval_seq', type=int, default=2)
+eval_arg.add_argument('--eval_pipeline', type=str, default='LOGG3D')
+eval_arg.add_argument('--kitti_eval_seq', type=int, default=0)
 eval_arg.add_argument('--mulran_eval_seq', type=str,
                       default='Riverside/Riverside_02')
 eval_arg.add_argument('--checkpoint_name', type=str,
-                      default='/kitti_10cm_loo/2021-09-14_03-43-02_3n24h_Kitti_v10_q29_10s0_262447.pth')
-eval_arg.add_argument('--batch_size', type=int, default=1)
-eval_arg.add_argument('--train_num_workers', type=int, default=1)
-eval_arg.add_argument("--random_rotation", type=str2bool,
+                      default='/checkpoints/LoGG3D/kitti_10cm_loo/3n24h_Kitti_v10_q29_10s0.pth')
+eval_arg.add_argument('--eval_batch_size', type=int, default=1)
+eval_arg.add_argument('--test_num_workers', type=int, default=1)
+eval_arg.add_argument("--eval_random_rotation", type=str2bool,
                       default=False, help="If random rotation. ")
-eval_arg.add_argument("--random_occlusion", type=str2bool,
+eval_arg.add_argument("--eval_random_occlusion", type=str2bool,
                       default=False, help="If random occlusion. ")
 
 eval_arg.add_argument("--revisit_criteria", default=3,
@@ -38,34 +38,34 @@ eval_arg.add_argument("--cd_thresh_min", default=0.001,
                       type=float, help="Thresholds on cosine-distance to top-1.")
 eval_arg.add_argument("--cd_thresh_max", default=1.0,
                       type=float, help="Thresholds on cosine-distance to top-1.")
-eval_arg.add_argument("--num_thresholds", default=500, type=int,
+eval_arg.add_argument("--num_thresholds", default=1000, type=int,
                       help="Number of thresholds. Number of points on PR curve.")
 
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
 # KittiDataset #MulRanDataset
-data_arg.add_argument('--dataset', type=str, default='KittiDataset')
+data_arg.add_argument('--eval_dataset', type=str, default='KittiDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
-data_arg.add_argument("--train_save_descriptors", type=str2bool, default=False)
-data_arg.add_argument("--train_save_counts", type=str2bool, default=False)
-data_arg.add_argument("--train_plot_pr_curve", type=str2bool, default=False)
+data_arg.add_argument("--eval_save_descriptors", type=str2bool, default=False)
+data_arg.add_argument("--eval_save_counts", type=str2bool, default=False)
+data_arg.add_argument("--eval_plot_pr_curve", type=str2bool, default=True)
 data_arg.add_argument('--num_points', type=int, default=80000)
 data_arg.add_argument('--voxel_size', type=float, default=0.10)
 data_arg.add_argument("--gp_rem", type=str2bool,
                       default=False, help="Remove ground plane.")
-data_arg.add_argument('--train_feature_distance', type=str,
+data_arg.add_argument('--eval_feature_distance', type=str,
                       default='cosine')  # cosine#euclidean
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
-data_arg.add_argument('--kitti_dir', type=str, default='/mnt/088A6CBB8A6CA742/Datasets/Kitti/dataset/',
+data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/Data0/DataSets/kitti/dataset/',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 3, 4, 5, 6, 7, 8, 9, 10],
-    'val': [2],
-    'test': [2]
+    'train': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'val': [],
+    'test': [0]
 })
 
 data_arg.add_argument('--mulran_dir', type=str,

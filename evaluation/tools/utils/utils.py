@@ -284,7 +284,7 @@ def load_files(folder):
 
 
 # 피클 파일들의 데이터를 데이터프레임으로 변환하는 함수
-def load_pickle_and_convert_df(path, pickle_files, threshold_linspace = [0.001, 1.0, 500]):
+def load_pickle_and_convert_df(path, pickle_files, threshold_linspace = [0.0, 1.0, 400]):
     # 피클 파일들의 데이터를 데이터프레임으로 변환
     dataframes_dict = {}
 

@@ -13,30 +13,29 @@ from models.pipelines.pipeline_utils import *
 from models.pipeline_factory import get_pipeline
 from tqdm import tqdm
 import pandas as pd
+from config.eval_config import *
 
-def calculate_pose_distance(pose1, pose2):
-    translation1 = pose1[:3, 3]
-    translation2 = pose2[:3, 3]
-    return np.linalg.norm(translation1 - translation2)
+torch.backends.cudnn.benchmark = True
 
-def calculate_pose_distances(poses):
-    n = len(poses)
-    n_progress_bar = tqdm(range(n), desc="* Calculate pose matching", leave=True)
-    distances = np.zeros((n, n))
-    for i in n_progress_bar:
-        for j in range(i + 1, n):
-            distances[i, j] = calculate_pose_distance(poses[i], poses[j])
-            distances[j, i] = distances[i, j]
+def calculate_pose_distances_with_pdist(poses):
+    # 각 pose에서 translation 벡터 (x, y, z)를 추출
+    translations = np.array([pose[:3, 3] for pose in poses])
+    
+    # pdist로 모든 쌍별 유클리드 거리 계산
+    distances = squareform(pdist(translations, metric='euclidean'))
+    
     return distances
 
 # @torch.no_grad()
 class Evaluator:
-    def __init__(self, checkpoint_path) -> None:
+    def __init__(self, checkpoint_path, thresholds_linspace = [0.0, 1.0, 400]) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        torch.backends.cudnn.benchmark = True
 
         self.checkpoint = torch.load(checkpoint_path)
-        self.args = self.checkpoint['config']
+        try:
+            self.args = self.checkpoint['config']
+        except:
+            self.args = get_config_eval()
 
         self.args.kitti_dir = '/media/vision/Data0/DataSets/kitti/dataset/'
         self.args.gm_dir = '/media/vision/Data0/DataSets/gm_datasets/'
@@ -50,14 +49,17 @@ class Evaluator:
 
         if 'Kitti' in self.args.dataset :
             self.pose_threshold = [3.0, 20.0]
-            self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}"
+            # self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}"
+            self.sequence = f"{int(checkpoint_path.split('.')[-2][-1]):02d}"
+            self.args.kitti_data_split['test'] = [int(checkpoint_path.split('.')[-2][-1])]
+            # self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1])
             self.dataset_path = os.path.join(self.args.kitti_dir, 'sequences', self.sequence)
         elif 'GM' in self.args.dataset:
             self.pose_threshold = [1.5, 10.0]
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
             self.dataset_path = os.path.join(self.args.gm_dir, self.sequence)
         
-        self.thresholds = np.linspace(0.001, 1.0, 500)
+        self.thresholds = np.linspace(thresholds_linspace[0], thresholds_linspace[1], thresholds_linspace[2])#[300:600]
         self.thresholds_num = len(self.thresholds)
         self.descriptors = []
 
@@ -72,15 +74,15 @@ class Evaluator:
         print(f"* pose_threshold: {self.pose_threshold}")
         print(f"* checkpoint: {checkpoint_path}")
         print(f"* model: {self.args.pipeline}")
-        print(f"* train_loss_function: {self.args.train_loss_function}")
-        print(f"* lazy_loss: {self.args.lazy_loss}")
-        print(f"* Optimizer: {self.args.optimizer}")
-        print(f"* base_learning_rate: {self.args.base_learning_rate}")
-        print(f"* scheduler: {self.args.scheduler}")
-        print(f"* dataset: {self.args.dataset}")
-        print(f"* use_random_rotation: {self.args.use_random_rotation}")
-        print(f"* use_random_occlusion: {self.args.use_random_occlusion}")
-        print(f"* use_random_scale: {self.args.use_random_scale}")
+        # print(f"* train_loss_function: {self.args.train_loss_function}")
+        # print(f"* lazy_loss: {self.args.lazy_loss}")
+        # print(f"* Optimizer: {self.args.optimizer}")
+        # print(f"* base_learning_rate: {self.args.base_learning_rate}")
+        # print(f"* scheduler: {self.args.scheduler}")
+        # print(f"* dataset: {self.args.dataset}")
+        # print(f"* use_random_rotation: {self.args.use_random_rotation}")
+        # print(f"* use_random_occlusion: {self.args.use_random_occlusion}")
+        # print(f"* use_random_scale: {self.args.use_random_scale}")
         print('*' * 50)
     
     def run(self):
@@ -89,10 +91,18 @@ class Evaluator:
         # print("* processing for gt matching ...")
         timestamps = np.array(load_timestamps(self.dataset_path + '/times.txt'))
         poses = load_poses(os.path.join(self.dataset_path, 'poses.txt'))
-        pose_distances_matrix = calculate_pose_distances(poses)
+        pose_distances_matrix = calculate_pose_distances_with_pdist(poses)
+
+
+        for j in range(0, 1300):
+            if pose_distances_matrix[1562][j] < 5.0:
+                print("!!!!!!!!!!", j, pose_distances_matrix[1562][j])
+
+
         # print("* processing for descriptors ...")
         descriptors = self._make_descriptors()
-        descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean'))
+
+        descriptor_distances_matrix = squareform(pdist(descriptors, 'cosine'))
         # print("* evaluate ...")
         matching_results = self._find_matching_poses(timestamps, pose_distances_matrix, descriptor_distances_matrix)
         
@@ -124,23 +134,27 @@ class Evaluator:
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
+                
         return np.array(descriptors_list)
         
 
     def _find_matching_poses(self, timestamps, pose_distances_matrix, descriptor_distances_matrix):
         start_time = timestamps[0]
         matching_results_list = [[] for _ in range(self.thresholds_num)]
+        self.revist = 0
 
         for i in tqdm(range(0, pose_distances_matrix.shape[0], 1), desc="* Matching descriptors", leave=True):
-            query_time = timestamps[i] 
-            if (query_time - start_time - 30) < 0: # Build retrieval database using entries 30s prior to current query. 
-                continue        
+            query_time = timestamps[i]
+
+            # 처음 skip_time 이전의 pose는 사용하지 않음
+            if (query_time - start_time - self.args.skip_time) < 0:
+                continue
 
             # 0초 ~ 현재 시간까지의 pose 중에서 30초 이전의 pose까지만 사용
             tt = next(x[0] for x in enumerate(timestamps)
-                if x[1] > (query_time - 30))
+                if x[1] > (query_time - self.args.skip_time))
             
-            revisit = []
+            revisit = False
             match_candidates = [[] for _ in range(self.thresholds_num)]
             
             for j in range(0, tt+1):
@@ -148,14 +162,17 @@ class Evaluator:
                     if descriptor_distances_matrix[i, j] < self.thresholds[th_idx]:
                         match_candidates[th_idx].append((j, pose_distances_matrix[i, j], descriptor_distances_matrix[i, j]))
                 if pose_distances_matrix[i, j] < self.pose_threshold[0]:
-                    revisit.append(j)
+                    revisit = True
             for th_idx in range(self.thresholds_num):
                 match_candidates[th_idx].sort(key=lambda x: x[2])
                 match_candidates[th_idx] = np.array(match_candidates[th_idx])
             
+            self.revist += 1 if revisit else 0
+            
             for th_idx in range(self.thresholds_num):
                 matches = []
-                if match_candidates[th_idx].shape[0] > 0: # Positive Prediction 
+                
+                if match_candidates[th_idx].shape[0] > 0: # Positive Prediction
                     for candidate in match_candidates[th_idx]:
                         #  matching된 j     gt에 있는 j
                         if candidate[1] <= self.pose_threshold[0]:
@@ -166,12 +183,13 @@ class Evaluator:
                             matches.append((i, candidate[0], candidate[1], candidate[2], "fp"))
                     # match_candidates가 존재하기에 모두 처리했는데도 매칭된 모두가 3~20m 사이에 있어 tp, fp 모두 안된 경우. 이 경우는 거의 없다.
                     if not matches:
-                        if revisit:
-                            # False Negative (FN): 매칭에 실패했으나, 실제로 매칭해야 하는 것이 있는 경우
-                            matches.append((i, -1, -1, -1, "fn"))
-                        else:
-                            # True Negative (TN): 매칭에 실패하고, 실제로도 매칭되는 것이 없는 경우
-                            matches.append((i, -1, -1, -1, "tn"))
+                        # if revisit:
+                        #     # False Negative (FN): 매칭에 실패했으나, 실제로 매칭해야 하는 것이 있는 경우
+                        #     matches.append((i, -1, -1, -1, "fn"))
+                        # else:
+                        #     # True Negative (TN): 매칭에 실패하고, 실제로도 매칭되는 것이 없는 경우
+                        #     matches.append((i, -1, -1, -1, "tn"))
+                        matches.append((i, -1, -1, -1, "on"))
                 else: # Negative Prediction
                     if revisit:
                         # False Negative (FN): 매칭에 실패했으나, 실제로 매칭해야 하는 것이 있는 경우
@@ -180,7 +198,8 @@ class Evaluator:
                         # True Negative (TN): 매칭에 실패하고, 실제로도 매칭되는 것이 없는 경우
                         matches.append((i, -1, -1, -1, "tn"))
                 
-                matching_results_list[th_idx].append(matches)
+                matching_results_list[th_idx].append(matches[:20])
+            tqdm.write(f"* id: {matching_results_list[-1][-1][0][0]}, n_id: {matching_results_list[-1][-1][0][1]}, is_rev: {revisit}, min_dist: {matching_results_list[-1][-1][0][3]:.3f}, p_dist: {matching_results_list[-1][-1][0][2]:.3f}")
         
         return matching_results_list
 
@@ -243,6 +262,12 @@ class Evaluator:
         max_f1_score_idx = df["F1-Score"].idxmax()
         corresponding_threshold = df["Thresholds"][max_f1_score_idx]
         corresponding_recall = df["Recall (TPR)"][max_f1_score_idx]
-        print(f"* Best F1-Score:\t {max_f1_score}, \tRecall: {corresponding_recall}, \tat thresholds: {corresponding_threshold}")
+        F1_TN = df["True Negatives"][max_f1_score_idx]
+        F1_FN = df["False Negatives"][max_f1_score_idx]
+        F1_FP = df["False Positives"][max_f1_score_idx]
+        F1_TP = df["True Positives"][max_f1_score_idx]
+        print(f"* Best F1-Score:\t {max_f1_score:.3f}, \tRecall: {corresponding_recall:.3f}, \tat thresholds: {corresponding_threshold:.3f}")
+        print(f"* num_revist: {self.revist}")
+        print(f"* TP: {F1_TP}, TN: {F1_TN}, FP: {F1_FP}, FN: {F1_FN}")
         # print(f"* Best F1-Score:\t {max_f1_score}, at that metrics:\n*\t", df[df["F1-Score"] == max_f1_score])
         return max_f1_score_idx

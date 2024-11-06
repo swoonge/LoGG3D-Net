@@ -7,6 +7,7 @@ from pipelines.overlap_transformer import *
 from pipelines.overlap_transformer_resnet import *
 from pipelines.overlap_transformer_ViT import *
 from pipelines.overlap_transformer_geo import *
+from pipelines.cvtnet import CVTNet
 
 
 def get_pipeline(cfg):
@@ -22,6 +23,8 @@ def get_pipeline(cfg):
         pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16, num_layers=1)
     elif cfg.pipeline == 'OverlapTransformer_geo':
         pipeline = OverlapTransformer_geo(channels=1, use_transformer=True)
+    elif cfg.pipeline == 'CVTNet':
+        pipeline = CVTNet(channels=5, use_transformer=True)
     return pipeline
 
 if __name__ == '__main__':

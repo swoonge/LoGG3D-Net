@@ -68,7 +68,8 @@ if __name__ == '__main__':
     
     model_path_list = [
         # [model_file_name, dataset, seq, [checkpoint_file_name]]
-        ['OverlapTransformer_geo/2024-10-24_16-07-32', 'kitti', 8, []], # kitti08 geo
-        # ['OverlapTransformer/2024-10-12_08-41-37', 'gm', 0, []], # triplet lazy False 00
+        # ['OverlapTransformer_geo/2024-10-24_16-07-32', 'kitti', 8, []], # kitti08 geo
+        ['OverlapTransformer/2024-10-12_08-41-37', 'gm', 0, []], # triplet lazy False 00
+        
     ]
     __main__(args, model_path_list)

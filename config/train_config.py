@@ -12,8 +12,8 @@ def str2bool(v):
 
 # Training
 trainer_arg = add_argument_group('Train')
-# LOGG3D, OverlapTransformer, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo
-trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_geo')
+# LOGG3D, OverlapTransformer, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo, CVTNet
+trainer_arg.add_argument('--pipeline', type=str, default='CVTNet')
 trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
@@ -54,9 +54,9 @@ opt_arg.add_argument('--scheduler', type=str,
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
-# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset
+# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset # KittiCVTTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiRangeImageTupleDataset')
+                      default='KittiCVTTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -76,10 +76,20 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [0, 1, 3, 5, 6, 7, 9, 10],
+    'train': [1, 3, 4, 5, 6, 7, 8, 9, 10],
     'val': [2],
-    'test': [8]
+    'test': [0]
 })
+
+# RI and BEV generation
+ri_bev_arg = add_argument_group('RI_BE_VGeneration')
+ri_bev_arg.add_argument('--fov_up', type=float, default=25.0, help="Upper bound of vertical fov")
+ri_bev_arg.add_argument('--fov_down', type=float, default=3.0, help="Lower bound of vertical fov")
+ri_bev_arg.add_argument('--proj_H', type=int, default=64, help="Height of RIVs and BEVs")
+ri_bev_arg.add_argument('--proj_W', type=int, default=900, help="Width of RIVs and BEVs")
+ri_bev_arg.add_argument('--range_th', type=list, default=[0, 15, 30, 45, 80], help="Range thresholds to generate multi-layer inputs")
+ri_bev_arg.add_argument('--height_th', type=list, default=[-3, -1.5, 0, 1.5, 5], help="Height thresholds to generate multi-layer inputs")
+ri_bev_arg.add_argument('--train_seqs', type=list, default=["00"], help="Kitti sequences for training")
 
 data_arg.add_argument('--mulran_dir', type=str,
                       default='/media/vision/Data0/DataSets/MulRan/', help="Path to the MulRan dataset")
@@ -138,7 +148,7 @@ data_arg.add_argument('--max_scale', type=float, default=1.0)
 # Misc
 misc_arg = add_argument_group('Misc')
 # misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default_val')  ##############
-misc_arg.add_argument('--experiment_name', type=str, default='OverlapTransformer_geo')  ##############
+misc_arg.add_argument('--experiment_name', type=str, default='CVTNet')  ##############
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)

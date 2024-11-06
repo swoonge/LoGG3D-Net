@@ -5,15 +5,132 @@ import random
 import numpy as np
 import logging
 import json
-from utils.data_utils.range_projection import range_projection
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from utils.misc_utils import Timer
 from utils.o3d_tools import *
 from utils.data_loaders.pointcloud_dataset import *
+from data_utils.gen_ri_bev import *
+import argparse
+
 from utils.tictoc import Timer_for_general
 
-class KittiRangeImageDataset(PointCloudDataset):
+def range_projection(current_vertex, fov_up=10.67, fov_down=-30.67, proj_H=32, proj_W=900, max_range=80, cut_range=True,
+                     lower_bound=0.1, upper_bound=6):
+
+    fov_up = fov_up / 180.0 * np.pi
+    fov_down = fov_down / 180.0 * np.pi
+    fov = abs(fov_down) + abs(fov_up)
+
+    depth = np.linalg.norm(current_vertex[:, :3], 2, axis=1)
+
+    if cut_range:
+        current_vertex = current_vertex[
+        (depth > lower_bound) & (depth < upper_bound)]
+        depth = depth[(depth > lower_bound) & (depth < upper_bound)]
+    else:
+        current_vertex = current_vertex[(depth > 0) & (depth < max_range)]
+        depth = depth[(depth > 0) & (depth < max_range)]
+
+    scan_x = current_vertex[:, 0]
+    scan_y = current_vertex[:, 1]
+    scan_z = current_vertex[:, 2]
+
+    yaw = -np.arctan2(scan_y, scan_x)
+    pitch = np.arcsin(scan_z / depth)
+
+    proj_x = 0.5 * (yaw / np.pi + 1.0)
+    proj_y = 1.0 - (pitch + abs(fov_down)) / fov
+
+    proj_x *= proj_W
+    proj_y *= proj_H
+
+    proj_x = np.floor(proj_x)
+    proj_x = np.minimum(proj_W - 1, proj_x)
+    proj_x = np.maximum(0, proj_x).astype(np.int32)
+
+    proj_y = np.floor(proj_y)
+    proj_y = np.minimum(proj_H - 1, proj_y)
+    proj_y = np.maximum(0, proj_y).astype(np.int32)
+
+    order = np.argsort(depth)[::-1]
+    depth = depth[order]
+    proj_y = proj_y[order]
+    proj_x = proj_x[order]
+
+    scan_x = scan_x[order]
+    scan_y = scan_y[order]
+    scan_z = scan_z[order]
+
+    indices = np.arange(depth.shape[0])
+    indices = indices[order]
+
+    proj_range = np.full((proj_H, proj_W), -1,
+                        dtype=np.float32)
+    proj_vertex = np.full((proj_H, proj_W, 4), -1,
+                            dtype=np.float32)
+    proj_idx = np.full((proj_H, proj_W), -1,
+                        dtype=np.int32)
+
+    proj_range[proj_y, proj_x] = depth
+    proj_vertex[proj_y, proj_x] = np.array([scan_x, scan_y, scan_z, np.ones(len(scan_x))]).T
+    proj_idx[proj_y, proj_x] = indices
+
+    return proj_range, proj_vertex, proj_idx
+
+def bev_projection(current_vertex, proj_H=32, proj_W=900, max_range=80, cut_height=True, lower_bound=10, upper_bound=20):
+
+    depth = np.linalg.norm(current_vertex[:, :3], 2, axis=1)
+    scan_z_tmp = current_vertex[:, 2]
+    if cut_height:
+        current_vertex = current_vertex[(depth > 0) & (depth < max_range) & (scan_z_tmp > lower_bound) & (
+                scan_z_tmp < upper_bound)]
+        depth = depth[(depth > 0) & (depth < max_range) & (scan_z_tmp > lower_bound) & (scan_z_tmp < upper_bound)]
+    else:
+        current_vertex = current_vertex[(depth > 0) & (depth < max_range)]
+        depth = depth[(depth > 0) & (depth < max_range)]
+
+    scan_x = current_vertex[:, 0]
+    scan_y = current_vertex[:, 1]
+    scan_z = current_vertex[:, 2]
+
+    if scan_z.shape[0] == 0:
+        return np.full((proj_H, proj_W), 0, dtype=np.float32)
+
+    yaw = -np.arctan2(scan_y, scan_x)
+    pitch = np.arcsin(scan_z / depth)
+
+    scan_r = depth * np.cos(pitch)
+
+    proj_x = 0.5 * (yaw / np.pi + 1.0)
+    proj_y = scan_r / max_range
+
+    proj_x = proj_x * proj_W
+    proj_y = proj_y * proj_H
+
+    proj_x = np.floor(proj_x)
+    proj_x = np.minimum(proj_W - 1, proj_x)
+    proj_x = np.maximum(0, proj_x).astype(np.int32)
+
+    proj_y = np.floor(proj_y)
+    proj_y = np.minimum(proj_H - 1, proj_y)
+    proj_y = np.maximum(0, proj_y).astype(np.int32)
+
+    order = np.argsort(scan_z)
+    scan_z = scan_z[order]
+    proj_y = proj_y[order]
+    proj_x = proj_x[order]
+
+    kitti_lidar_height = 2
+
+    proj_bev = np.full((proj_H, proj_W), 0,
+                        dtype=np.float32)
+
+    proj_bev[proj_y, proj_x] = scan_z + abs(kitti_lidar_height)
+
+    return proj_bev
+
+class KittiCVTDataset(PointCloudDataset):
     r"""
     Generate single pointcloud frame from KITTI odometry dataset. 
     """
@@ -28,6 +145,19 @@ class KittiRangeImageDataset(PointCloudDataset):
         self.root = root = config.kitti_dir
         self.gp_rem = config.gp_rem
         self.pnv_prep = config.pnv_preprocessing
+
+        self.fov_up = config.fov_up
+        self.fov_down = config.fov_down
+        self.proj_H = config.proj_H
+        self.proj_W = config.proj_W
+        self.range_thresh = config.range_th
+        self.height_thresh = config.height_th
+
+        self.min_range = min(self.range_thresh)
+        self.max_range = max(self.range_thresh)
+        self.min_height = min(self.height_thresh)
+        self.max_height = max(self.height_thresh)
+
         self.timer = Timer()
 
         PointCloudDataset.__init__(
@@ -59,82 +189,72 @@ class KittiRangeImageDataset(PointCloudDataset):
         fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
         return fname
     
-    def get_rangeimage_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/depth_map/%06d.png' % (drive, t)
+    def get_npz_fn(self, drive, t):
+        fname = self.root + '/sequences/%02d/ri_bev/%06d.npz' % (drive, t)
         return fname
 
-    def get_pointcloud_tensor(self, drive_id, pc_id):
+    def get_ri_bev_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, pc_id)
-        xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
+        current_vertex = data2xyzi(np.fromfile(fname))[0]
+        ri_bev = np.zeros((len(self.range_thresh)+len(self.height_thresh), self.proj_H, self.proj_W))
+        for i in range(len(self.range_thresh)-1):
+            nearer_bound = self.range_thresh[i]
+            farer_bound = self.range_thresh[i+1]
+            lower_bound = self.height_thresh[i]
+            upper_bound = self.height_thresh[i+1]
+            proj_range, _, _ = range_projection(current_vertex,
+                                                fov_up=self.fov_up,
+                                                fov_down=self.fov_down,
+                                                proj_H=self.proj_H,
+                                                proj_W=self.proj_W,
+                                                max_range=self.max_range,
+                                                cut_range=True,
+                                                lower_bound=nearer_bound,
+                                                upper_bound=farer_bound)
+            proj_bev = bev_projection(current_vertex,
+                                      proj_H=self.proj_H,
+                                      proj_W=self.proj_W,
+                                      max_range=self.max_range,
+                                      cut_height=True,
+                                      lower_bound=lower_bound,
+                                      upper_bound=upper_bound)
 
-        if self.gp_rem:
-            not_ground_mask = np.ones(len(xyzr), bool)
-            raw_pcd = make_open3d_point_cloud(xyzr[:, :3], color=None)
-            _, inliers = raw_pcd.segment_plane(0.2, 3, 250)
-            not_ground_mask[inliers] = 0
-            xyzr = xyzr[not_ground_mask]
+            ri_bev[int(i+1),:,:] = proj_range
+            ri_bev[int(i+1+len(self.range_thresh)), :, :] = proj_bev
 
-        if self.pnv_prep:
-            xyzr = self.pnv_preprocessing(xyzr)
-        if self.random_rotation:
-            xyzr = self.random_rotate(xyzr)
-        if self.random_occlusion:
-            xyzr = self.occlude_scan(xyzr)
-        if self.random_scale and random.random() < 0.95:
-            scale = self.min_scale + \
-                (self.max_scale - self.min_scale) * random.random()
-            xyzr = scale * xyzr
-
-        return xyzr
-
-    def get_rangeimage_tensor(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
-        xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
-        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
-        # range_image = self.fill_zero_rows(range_image)
-        return range_image
-
-    def fill_zero_rows(self, depth_image):
-        # depth_image는 [64, 900] 형태라고 가정
-        depth_image = depth_image.copy()  # 원본 배열을 변경하지 않도록 복사
-
-        # 0이 있는 행의 인덱스를 찾음
-        zero_rows = np.where(np.all(depth_image == 0, axis=1))[0]
-
-        for row in zero_rows:
-            # 가장 가까운 행을 찾기 위해 위쪽, 아래쪽 모두 탐색
-            upper_row = row - 1
-            lower_row = row + 1
-
-            while upper_row >= 0 or lower_row < depth_image.shape[0]:
-                # 위쪽에 가장 가까운 0이 아닌 값을 찾음
-                if upper_row >= 0 and not np.all(depth_image[upper_row, :] == 0):
-                    depth_image[row, :] = depth_image[upper_row, :]
-                    break
-                
-                # 아래쪽에 가장 가까운 0이 아닌 값을 찾음
-                if lower_row < depth_image.shape[0] and not np.all(depth_image[lower_row, :] == 0):
-                    depth_image[row, :] = depth_image[lower_row, :]
-                    break
-                
-                # 위쪽과 아래쪽으로 계속해서 확장
-                upper_row -= 1
-                lower_row += 1
-
-        return depth_image
+            ri_bev[0, :, :], _, _ = range_projection(current_vertex,
+                                                    fov_up=self.fov_up,
+                                                    fov_down=self.fov_down,
+                                                    proj_H=self.proj_H,
+                                                    proj_W=self.proj_W,
+                                                    max_range=self.max_range,
+                                                    cut_range=True,
+                                                    lower_bound=self.min_range,
+                                                    upper_bound=self.max_range)
+            ri_bev[len(self.range_thresh), :, :] = bev_projection(current_vertex,
+                                                            proj_H=self.proj_H,
+                                                            proj_W=self.proj_W,
+                                                            max_range=self.max_range,
+                                                            cut_height=True,
+                                                            lower_bound=self.min_height,
+                                                            upper_bound=self.max_height)
+        return ri_bev
+    
+    def get_ri_bev_tensor_at_file(self, drive_id, pc_id):
+        return np.load(self.get_npz_fn(drive_id, pc_id))['ri_bev']
 
     def __getitem__(self, idx):
         drive_id = self.files[idx][0]
         t0 = self.files[idx][1]
 
-        xyz0_th = self.get_rangeimage_tensor(drive_id, t0)
+        xyz0_th = self.get_ri_bev_tensor(drive_id, t0)
         meta_info = {'drive': drive_id, 't0': t0}
 
         return (xyz0_th,
                 meta_info)
 
 
-class KittiRangeImageTupleDataset(KittiRangeImageDataset):
+class KittiCVTTupleDataset(KittiCVTDataset):
     r"""
     Generate tuples (anchor, positives, negatives) using distance
     Optional other_neg for quadruplet loss. 
@@ -152,7 +272,21 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
         self.quadruplet = False
         self.gp_rem = config.gp_rem
         self.pnv_prep = config.pnv_preprocessing
+
+        self.fov_up = config.fov_up
+        self.fov_down = config.fov_down
+        self.proj_H = config.proj_H
+        self.proj_W = config.proj_W
+        self.range_thresh = config.range_th
+        self.height_thresh = config.height_th
+
+        self.min_range = min(self.range_thresh)
+        self.max_range = max(self.range_thresh)
+        self.min_height = min(self.height_thresh)
+        self.max_height = max(self.height_thresh)
+
         self.timer = Timer_for_general()
+
         if config.train_loss_function == 'quadruplet':
             self.quadruplet = True
 
@@ -221,7 +355,7 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
         return other_neg_id[0]
 
     def __getitem__(self, idx):
-        self.timer.tic()
+        # self.timer.tic()
         drive_id, query_id = self.files[idx][0], self.files[idx][1]
         positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
 
@@ -236,15 +370,16 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
             negative_ids, self.negatives_per_query)
         positives, negatives, other_neg = [], [], None
 
-        query_th = self.get_rangeimage_tensor(drive_id, query_id)
+        query_th = self.get_ri_bev_tensor_at_file(drive_id, query_id)
         for sp_id in sel_positive_ids:
-            positives.append(self.get_rangeimage_tensor(drive_id, sp_id))
+            positives.append(self.get_ri_bev_tensor_at_file(drive_id, sp_id))
         for sn_id in sel_negative_ids:
-            negatives.append(self.get_rangeimage_tensor(drive_id, sn_id))
+            negatives.append(self.get_ri_bev_tensor_at_file(drive_id, sn_id))
 
         meta_info = {'drive': drive_id, 'query_id': query_id}
 
         if not self.quadruplet:
+            # print(self.timer.toc())
             return (query_th,
                     positives,
                     negatives,
@@ -252,8 +387,8 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
         else:  # For Quadruplet Loss
             other_neg_id = self.get_other_negative(
                 drive_id, query_id, sel_positive_ids, sel_negative_ids)
-            other_neg_th = self.get_rangeimage_tensor(drive_id, other_neg_id)
-            print(f"Time for one iteration: {self.timer.toc()}")
+            other_neg_th = self.get_ri_bev_tensor_at_file(drive_id, other_neg_id)
+            # print(self.timer.toc())
             return (query_th,
                     positives,
                     negatives,
