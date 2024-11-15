@@ -85,7 +85,7 @@ data_arg.add_argument('--eval_feature_distance', type=str,
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
-data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/Data0/DataSets/kitti/dataset/',
+data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/SSD1/Datasets/kitti/dataset/',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_data_split', type=dict, default={
     'train': [3, 4, 5, 6, 7, 8, 9],

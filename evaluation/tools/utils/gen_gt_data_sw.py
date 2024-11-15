@@ -17,12 +17,12 @@ from utils import *
 from tqdm import trange
 
 seqs = ["00","01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
-data_folder = "/media/vision/Data0/DataSets/kitti/dataset/sequences/"
+data_folder = "/media/vision/SSD1/Datasets/kitti/dataset/sequences/"
 
 for seq in seqs:
     print("processing seq: ", seq)
     # paths of kitti dataset
-    # /media/vision/Data0/DataSets/kitti/dataset/sequences
+    # /media/vision/SSD1/Datasets/kitti/dataset/sequences
     scan_folder = data_folder + seq + "/velodyne"
     calib_file = data_folder + seq + "/calib.txt"
     # prepare poses of semantic kitti dataset (refined poses)

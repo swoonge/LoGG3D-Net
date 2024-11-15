@@ -29,6 +29,7 @@ class KittiRangeImageDataset(PointCloudDataset):
         self.gp_rem = config.gp_rem
         self.pnv_prep = config.pnv_preprocessing
         self.timer = Timer()
+        self.target_channel = config.target_channel if hasattr(config, 'target_channel') else None
 
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
@@ -91,8 +92,40 @@ class KittiRangeImageDataset(PointCloudDataset):
         fname = self.get_velodyne_fn(drive_id, pc_id)
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
         range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
-        # range_image = self.fill_zero_rows(range_image)
+        if self.target_channel:
+            range_image = self.reduce_channel(range_image, self.target_channel)
         return range_image
+
+    def reduce_channel(self, range_image, target_channel):
+        """
+        채널 수를 감소시켜 target_channel에 맞추되, 선택한 채널만 남기고 나머지 채널은 검은색(0)으로 설정합니다.
+        
+        Args:
+            range_image (numpy.ndarray): 원본 range image (C, W) 형태의 배열.
+            target_channel (int): 유지하고자 하는 채널 수.
+        
+        Returns:
+            numpy.ndarray: 채널을 줄인 후 크기를 유지한 range image (C, W) 형태의 배열.
+        """
+        # 현재 채널 수와 너비
+        current_channel, _ = range_image.shape
+        
+        # 간격 계산
+        step = current_channel // target_channel
+        
+        ## 입력과 같은 크기의 이미지 반환
+        # 초기화된 0 배열 (검은색 채널로 설정)
+        reduced_range_image = np.zeros_like(range_image)
+        # 선택한 채널만 복사
+        reduced_range_image[::step, :] = range_image[::step, :]
+
+        # ## 줄어든 체널에 따라 이미지 크기 조정
+        # # 간격에 따라 채널 선택
+        # reduced_range_image = range_image[::step, :]
+        # # 만약 초과로 선택되었을 경우 초과 채널을 잘라냄
+        # reduced_range_image = reduced_range_image[:target_channel, :]
+        
+        return reduced_range_image
 
     def fill_zero_rows(self, depth_image):
         # depth_image는 [64, 900] 형태라고 가정
@@ -155,6 +188,7 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
         self.timer = Timer_for_general()
         if config.train_loss_function == 'quadruplet':
             self.quadruplet = True
+        self.target_channel = config.target_channel if hasattr(config, 'target_channel') else None          
 
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
@@ -221,7 +255,7 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
         return other_neg_id[0]
 
     def __getitem__(self, idx):
-        self.timer.tic()
+        # self.timer.tic()
         drive_id, query_id = self.files[idx][0], self.files[idx][1]
         positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
 
@@ -253,13 +287,12 @@ class KittiRangeImageTupleDataset(KittiRangeImageDataset):
             other_neg_id = self.get_other_negative(
                 drive_id, query_id, sel_positive_ids, sel_negative_ids)
             other_neg_th = self.get_rangeimage_tensor(drive_id, other_neg_id)
-            print(f"Time for one iteration: {self.timer.toc()}")
+            # print(f"Time for one iteration: {self.timer.toc()}")
             return (query_th,
                     positives,
                     negatives,
                     other_neg_th,
                     meta_info)
-
 
 #####################################################################################
 # Load poses

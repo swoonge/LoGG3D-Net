@@ -24,26 +24,15 @@ def __main__(test_models_list, linspace, diff_ch = None):
             os.makedirs(save_folder_path)
 
         for checkpoint_name in test_models[1]:
-            results_dict = {}
             checkpoint_path = os.path.join('../checkpoints', model_path, checkpoint_name)
             if diff_ch == None:
                 evaluator = Evaluator(checkpoint_path, linspace)
             else:
                 evaluator = Evaluator_diff_ch(checkpoint_path, linspace, diff_ch)
 
-            matching_results, metrics_list = evaluator.run()
+            evaluator.make_and_save_descriptors(64)
 
-            max_f1_score_idx = evaluator.analyze_metrics(metrics_list)
-            results_dict['matching_results'] = matching_results[max_f1_score_idx]
-            results_dict['metrics_list'] = metrics_list
-            results_dict['max_f1_score_idx'] = max_f1_score_idx
-            results_dict['linspace'] = linspace
-
-            save_folder_path = os.path.join(os.path.dirname(__file__), 'results', model_path)
-            with open(os.path.join(save_folder_path, 'evaluation_results_' + checkpoint_name.split('.')[0] + '_64ch.pkl'), 'wb') as file:
-                pickle.dump(results_dict, file)
-
-            del evaluator, matching_results, metrics_list, results_dict
+            del evaluator
 
 if __name__ == '__main__':
     test_models_list = [
@@ -56,13 +45,8 @@ if __name__ == '__main__':
         #                            '3n24h_Kitti_v10_q29_10s7.pth',
         #                            '3n24h_Kitti_v10_q29_10s8.pth']], # triplet lazy False 00
         # ['LoGG3D/kitti_10cm_loo', ['3n24h_Kitti_v10_q29_10s0.pth']], # triplet lazy False 00
-        # ['OverlapTransformer/2024-10-11_00-46-31', ['epoch_best_71.pth']],
-        # ['OverlapTransformer/2024-10-10_15-48-19', ['epoch_best_34.pth']],
-        # ['CVTNet/2024-11-07_16-15-36', ['epoch_best_42.pth', 'epoch_69.pth', 'epoch_141.pth']],
-        # ['CVTNet/pretrained_NCLT',['pretrained_model.pth.tar']]
-        ['OverlapTransformer/2024-10-10_14-06-46',['epoch_best_27.pth', 'epoch_best_43.pth']],
-        ['CVTNet/2024-11-14_15-43-53',['epoch_29.pth','epoch_best_26.pth', 'epoch_best_65.pth', 'epoch_best_74.pth']]
+        ['OverlapTransformer/2024-10-11_00-46-31', ['epoch_best_71.pth']],
+        ['OverlapTransformer/2024-10-10_15-48-19', ['epoch_best_34.pth']]
     ]
     linspace = [0.001, 1.0, 1000]
-    diff_ch = None #[64,16]
-    __main__(test_models_list, linspace, diff_ch=diff_ch)
+    __main__(test_models_list, linspace, diff_ch=[64,16])

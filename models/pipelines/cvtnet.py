@@ -123,7 +123,9 @@ class featureExtracter_RI_BEV(nn.Module):
         self.conv0 = nn.Conv2d(channels, 8, kernel_size=(2,1), stride=(2,1), bias=False)
         self.conv1 = nn.Conv2d(8, 16, kernel_size=(2,1), stride=(2,1), bias=False)
         
+        # # for NCLT, you need revise this:
         # self.conv1 = nn.Conv2d(channels, 16, kernel_size=(2,1), stride=(2,1), bias=False)
+
         self.conv1_add = nn.Conv2d(16, 16, kernel_size=(5,1), stride=(1,1), bias=False)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=(3,1), stride=(1,1), bias=False)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=(3,1), stride=(1,1), bias=False)
@@ -143,9 +145,13 @@ class featureExtracter_RI_BEV(nn.Module):
 
 
     def forward(self, x_l):
-        ## for KITTI, you need revise this: [6, 5, 64, 900]
+        # for KITTI, you need revise this:
         out_l = self.relu(self.conv0(x_l))  # [13, 16, 32, 900]
         out_l = self.relu(self.conv1(out_l))
+        
+        # # # for NCLT, you need revise this:
+        # out_l = self.relu(self.conv1(x_l))
+
         out_l = self.relu(self.conv1_add(out_l))
         out_l = self.relu(self.conv2(out_l))
         out_l = self.relu(self.conv3(out_l))
@@ -154,7 +160,7 @@ class featureExtracter_RI_BEV(nn.Module):
         out_l = self.relu(self.conv6(out_l))
         out_l = self.relu(self.conv7(out_l))
 
-        out_l_1 = out_l.permute(0,1,3,2) # 디버깅용 [6, 128, 900, 9]
+        out_l_1 = out_l.permute(0,1,3,2) # 디버깅용 [6, 128, 900, 1]
         out_l_1 = self.relu(self.convLast1(out_l_1))
 
         if self.use_transformer:
@@ -216,59 +222,69 @@ class CVTNet(nn.Module):
 
 
     def forward(self, x_ri_bev):
-        x_ri = x_ri_bev[:, 0:5, :, :]
+        ## Multi-View(RIV, BEV) Multi-Layer Aligned Feature Encoder
+        x_ri = x_ri_bev[:, 0:5, :, :] # [6, 5, 64, 900]
         x_bev = x_ri_bev[:, 5:10, :, :]
 
-        feature_ri = self.featureExtracter_RI(x_ri)
+        feature_ri = self.featureExtracter_RI(x_ri) # [6, 256, 900, 1]
         feature_bev = self.featureExtracter_BEV(x_bev)
 
-        feature_ri = feature_ri.squeeze(-1)
-        feature_bev = feature_bev.squeeze(-1)
-        feature_ri = feature_ri.permute(0, 2, 1)
+        feature_ri = feature_ri.squeeze(-1) # [6, 256, 900]
+        feature_bev = feature_bev.squeeze(-1) 
+        feature_ri = feature_ri.permute(0, 2, 1) # [6, 900, 256]
         feature_bev = feature_bev.permute(0, 2, 1)
-        feature_ri = F.normalize(feature_ri, dim=-1)
+        feature_ri = F.normalize(feature_ri, dim=-1) # [6, 900, 256]
         feature_bev = F.normalize(feature_bev, dim=-1)
 
-        feature_ri = self.norm_1(feature_ri)
-        feature_bev = self.norm_1(feature_bev)
+        ## inter-transformer module
+        feature_ri = self.norm_1(feature_ri) # [6, 900, 256]
+        feature_bev = self.norm_1(feature_bev) # [6, 900, 256]
 
-        feature_fuse1 = feature_bev + self.attn1(feature_bev, feature_ri, feature_ri, mask=None)
-        feature_fuse1 = self.norm_2(feature_fuse1)
+        # First BEV(Query) cross attention with RIV(Key, Value)
+        feature_fuse1 = feature_bev + self.attn1(feature_bev, feature_ri, feature_ri, mask=None) # [6, 900, 256]
+        feature_fuse1 = self.norm_2(feature_fuse1) # [6, 900, 512]
         feature_fuse1 = feature_fuse1 + self.ff1(feature_fuse1)
 
+        # First RIV(Query) cross attention with BEV(Key, Value)
         feature_fuse2 = feature_ri + self.attn2(feature_ri, feature_bev, feature_bev, mask=None)
         feature_fuse2 = self.norm_3(feature_fuse2)
         feature_fuse2 = feature_fuse2 + self.ff2(feature_fuse2)
 
+        # Second BEV(Query) cross attention with RIV(Key, Value)
         feature_fuse1_ext = feature_fuse1 + self.attn1_ext(feature_fuse1, feature_ri, feature_ri, mask=None)
         feature_fuse1_ext = self.norm_2_ext(feature_fuse1_ext)
         feature_fuse1_ext = feature_fuse1_ext + self.ff1_ext(feature_fuse1_ext)
 
+        # Second RIV(Query) cross attention with BEV(Key, Value)
         feature_fuse2_ext = feature_fuse2 + self.attn2_ext(feature_fuse2, feature_bev, feature_bev, mask=None)
         feature_fuse2_ext = self.norm_3_ext(feature_fuse2_ext)
         feature_fuse2_ext = feature_fuse2_ext + self.ff2_ext(feature_fuse2_ext)
 
-        feature_fuse = torch.cat((feature_fuse1_ext, feature_fuse2_ext), dim=-2)
-        feature_cat_origin = torch.cat((feature_bev, feature_ri), dim=-2)
-        feature_fuse = torch.cat((feature_fuse, feature_cat_origin), dim=-1)
+        # Cat Features
+        feature_fuse = torch.cat((feature_fuse1_ext, feature_fuse2_ext), dim=-2) # [6, 1800, 256]
+        feature_cat_origin = torch.cat((feature_bev, feature_ri), dim=-2) # [6, 1800, 256]
+        feature_fuse = torch.cat((feature_fuse, feature_cat_origin), dim=-1) # [6, 1800, 512]
+        feature_fuse = feature_fuse.permute(0, 2, 1) # [6, 512, 1800]
 
-        feature_fuse = feature_fuse.permute(0, 2, 1)
-
-        feature_com = feature_fuse.unsqueeze(3)
-
+        # Feed feature_fuse into NetVLAD
+        feature_com = feature_fuse.unsqueeze(3) # [6, 512, 1800, 1]
         feature_com = F.normalize(feature_com, dim=1)
-        feature_com = self.net_vlad(feature_com)
+        feature_com = self.net_vlad(feature_com) # [6, 256]
         feature_com = F.normalize(feature_com, dim=1)
 
+        ## Intra-transformer module with RIV
         feature_ri = feature_ri.permute(0, 2, 1)
         feature_ri = feature_ri.unsqueeze(-1)
         feature_ri_enhanced = self.net_vlad_ri(feature_ri)
         feature_ri_enhanced = F.normalize(feature_ri_enhanced, dim=1)
 
+        ## Intra-transformer module with BEV
         feature_bev = feature_bev.permute(0, 2, 1)
         feature_bev = feature_bev.unsqueeze(-1)
         feature_bev_enhanced = self.net_vlad_ri(feature_bev)
         feature_bev_enhanced = F.normalize(feature_bev_enhanced, dim=1)
+
+        ## 
         feature_com = torch.cat((feature_ri_enhanced, feature_com), dim=1)
         feature_com = torch.cat((feature_com, feature_bev_enhanced), dim=1)
 

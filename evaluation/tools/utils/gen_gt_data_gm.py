@@ -18,12 +18,12 @@ from tqdm import trange
 
 # seqs = ["07_01", "07_02", "08_01", "08_02"]
 seqs = ["08_01"]
-data_folder = "/media/vision/Data0/DataSets/gm_datasets/"
+data_folder = "/media/vision/SSD1/Datasets/gm_datasets/"
 
 for seq in seqs:
     print("processing seq: ", seq)
     # paths of kitti dataset
-    # /media/vision/Data0/DataSets/kitti/dataset/sequences
+    # /media/vision/SSD1/Datasets/kitti/dataset/sequences
     scan_folder = data_folder + seq + "/velodyne"
     calib_file = data_folder + seq + "/calib.txt"
     # prepare poses of semantic kitti dataset (refined poses)

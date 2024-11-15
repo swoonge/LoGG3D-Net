@@ -45,16 +45,16 @@ trainer_arg.add_argument('--scene_loss_weight', type=float, default=1.0)  # 0.1
 # Optimizer arguments
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
-opt_arg.add_argument('--max_epoch', type=int, default=200)  # 20
-opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # 1e-3 ##############
+opt_arg.add_argument('--max_epoch', type=int, default=50)  # 20
+opt_arg.add_argument('--base_learning_rate', type=float, default=5e-6) # 1e-3 ##############
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 #cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
-opt_arg.add_argument('--scheduler', type=str,
-                     default='ReduceLROnPlateau') 
+opt_arg.add_argument('--scheduler', type=str, default='step') 
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
 # KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset # KittiCVTTupleDataset
+# NCLTRiBevTupleDataset
 data_arg.add_argument('--dataset', type=str,
                       default='KittiCVTTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
@@ -66,7 +66,7 @@ data_arg.add_argument("--gp_rem", type=str2bool,
 data_arg.add_argument("--pnv_preprocessing", type=str2bool,
                       default=False, help="Preprocessing in dataloader for PNV.")
 
-data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/Data0/DataSets/kitti/dataset/',
+data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/SSD1/Datasets/kitti/dataset',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_3m_json', type=str,
                       default='positive_sequence_D-3_T-0.json')
@@ -76,9 +76,9 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default={
     "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
     "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 3, 4, 5, 6, 7, 8, 9, 10],
+    'train': [0, 3, 4, 5, 6, 7, 9, 10],
     'val': [2],
-    'test': [0]
+    'test': [8]
 })
 
 # RI and BEV generation
@@ -92,7 +92,7 @@ ri_bev_arg.add_argument('--height_th', type=list, default=[-3, -1.5, 0, 1.5, 5],
 ri_bev_arg.add_argument('--train_seqs', type=list, default=["00"], help="Kitti sequences for training")
 
 data_arg.add_argument('--mulran_dir', type=str,
-                      default='/media/vision/Data0/DataSets/MulRan/', help="Path to the MulRan dataset")
+                      default='/media/vision/SSD1/Datasets/MulRan/', help="Path to the MulRan dataset")
 data_arg.add_argument("--mulran_normalize_intensity", type=str2bool,
                       default=False, help="Normalize intensity return.")
 data_arg.add_argument('--mulran_3m_json', type=str,
@@ -112,7 +112,7 @@ data_arg.add_argument('--mulran_data_split', type=dict, default={
 })
 
 data_arg.add_argument('--gm_dir', type=str,
-                      default='/media/vision/Data0/DataSets/gm_datasets', help="Path to the gm dataset")
+                      default='/media/vision/SSD1/Datasets/gm_datasets', help="Path to the gm dataset")
 data_arg.add_argument("--gm_normalize_intensity", type=str2bool,
                       default=False, help="Normalize intensity return.")
 data_arg.add_argument('--gm_3m_json', type=str,
@@ -126,6 +126,23 @@ data_arg.add_argument('--gm_data_split', type=dict, default={
     'val': [3],
     'test': [3]
 })
+
+data_arg.add_argument('--nclt_dir', type=str,
+                      default='/media/vision/SSD1/Datasets/NCLT', help="Path to the gm dataset")
+data_arg.add_argument("--nclt_normalize_intensity", type=str2bool,
+                      default=False, help="Normalize intensity return.")
+data_arg.add_argument('--nclt_3m_json', type=str,
+                      default='positive_sequence_D-3_T-0.json')
+data_arg.add_argument('--nclt_20m_json', type=str,
+                      default='positive_sequence_D-20_T-0.json')
+data_arg.add_argument('--nclt_seq_lens', type=dict, default={
+    "2012-01-08": 27903, "2012-01-15": 33463, "2012-01-22": 25998, "2012-02-02": 29213, "2012-02-05":28054})
+data_arg.add_argument('--nclt_data_split', type=dict, default={
+    'train': ["2012-01-08"],
+    'val': ["2012-02-05"],
+    'test': ["2012-02-05"]
+})
+
 
 # Data loader configs
 data_arg.add_argument('--train_phase', type=str, default="train")

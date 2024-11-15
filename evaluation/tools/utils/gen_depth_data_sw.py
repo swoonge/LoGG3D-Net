@@ -67,9 +67,9 @@ def gen_depth_data(scan_folder, dst_folder, normalize=False):
 
 
 if __name__ == '__main__':
-    # main_folder = '/media/vision/Data0/DataSets/kitti/dataset/sequences'
+    # main_folder = '/media/vision/SSD1/Datasets/kitti/dataset/sequences'
     # sequence = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10']
-    main_folder = '/media/vision/Data0/DataSets/gm_datasets'
+    main_folder = '/media/vision/SSD1/Datasets/gm_datasets'
     sequence = ['07_01', '07_02', '08_01', '08_02']
 
     for seq in sequence:

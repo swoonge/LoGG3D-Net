@@ -12,12 +12,14 @@ from utils.data_loaders.kitti.kitti_rangeimage_dataset import *
 from utils.data_loaders.gm.gm_dataset import *
 from utils.data_loaders.gm.gm_rangeimage_dataset import *
 from utils.data_loaders.kitti.kitti_cvt_dataset import *
+from utils.data_loaders.nclt.nclt_dataset import *
+from utils.data_loaders.nclt.nclt_ri_bev_dataset import *
 
 
 ALL_DATASETS = [
     KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
     MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset,
-    KittiCVTDataset, KittiCVTTupleDataset
+    KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset
     
 ]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}
@@ -75,6 +77,7 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
         try:
             Dataset = dataset_str_mapping[config.eval_dataset]
         except:
+            print(config.dataset)
             Dataset = dataset_str_mapping[config.dataset]
 
     dset = Dataset(phase,

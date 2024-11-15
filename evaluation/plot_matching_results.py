@@ -22,8 +22,8 @@ from tools.utils.matching_plotter import plotter
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('--dataset', default='kitti', type=str, help='dataset name', choices=['kitti', 'gm'])
-argparser.add_argument('--kitti_path', default='/media/vision/Data0/DataSets/kitti/dataset/', type=str, help='kitti dataset path')
-argparser.add_argument('--gm_path', default='/media/vision/Data0/DataSets/gm_datasets/', type=str, help='gm dataset path')
+argparser.add_argument('--kitti_path', default='/media/vision/SSD1/Datasets/kitti/dataset/', type=str, help='kitti dataset path')
+argparser.add_argument('--gm_path', default='/media/vision/SSD1/Datasets/gm_datasets/', type=str, help='gm dataset path')
 argparser.add_argument('--matching_data_folder', default='./results/', type=str, help='matching data folder')
 argparser.add_argument('--all_pkl', default=True, type=bool, help='whether to use all pkl files in the folder')
 

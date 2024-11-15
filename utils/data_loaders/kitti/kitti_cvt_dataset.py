@@ -11,124 +11,7 @@ from utils.misc_utils import Timer
 from utils.o3d_tools import *
 from utils.data_loaders.pointcloud_dataset import *
 from data_utils.gen_ri_bev import *
-import argparse
-
 from utils.tictoc import Timer_for_general
-
-def range_projection(current_vertex, fov_up=10.67, fov_down=-30.67, proj_H=32, proj_W=900, max_range=80, cut_range=True,
-                     lower_bound=0.1, upper_bound=6):
-
-    fov_up = fov_up / 180.0 * np.pi
-    fov_down = fov_down / 180.0 * np.pi
-    fov = abs(fov_down) + abs(fov_up)
-
-    depth = np.linalg.norm(current_vertex[:, :3], 2, axis=1)
-
-    if cut_range:
-        current_vertex = current_vertex[
-        (depth > lower_bound) & (depth < upper_bound)]
-        depth = depth[(depth > lower_bound) & (depth < upper_bound)]
-    else:
-        current_vertex = current_vertex[(depth > 0) & (depth < max_range)]
-        depth = depth[(depth > 0) & (depth < max_range)]
-
-    scan_x = current_vertex[:, 0]
-    scan_y = current_vertex[:, 1]
-    scan_z = current_vertex[:, 2]
-
-    yaw = -np.arctan2(scan_y, scan_x)
-    pitch = np.arcsin(scan_z / depth)
-
-    proj_x = 0.5 * (yaw / np.pi + 1.0)
-    proj_y = 1.0 - (pitch + abs(fov_down)) / fov
-
-    proj_x *= proj_W
-    proj_y *= proj_H
-
-    proj_x = np.floor(proj_x)
-    proj_x = np.minimum(proj_W - 1, proj_x)
-    proj_x = np.maximum(0, proj_x).astype(np.int32)
-
-    proj_y = np.floor(proj_y)
-    proj_y = np.minimum(proj_H - 1, proj_y)
-    proj_y = np.maximum(0, proj_y).astype(np.int32)
-
-    order = np.argsort(depth)[::-1]
-    depth = depth[order]
-    proj_y = proj_y[order]
-    proj_x = proj_x[order]
-
-    scan_x = scan_x[order]
-    scan_y = scan_y[order]
-    scan_z = scan_z[order]
-
-    indices = np.arange(depth.shape[0])
-    indices = indices[order]
-
-    proj_range = np.full((proj_H, proj_W), -1,
-                        dtype=np.float32)
-    proj_vertex = np.full((proj_H, proj_W, 4), -1,
-                            dtype=np.float32)
-    proj_idx = np.full((proj_H, proj_W), -1,
-                        dtype=np.int32)
-
-    proj_range[proj_y, proj_x] = depth
-    proj_vertex[proj_y, proj_x] = np.array([scan_x, scan_y, scan_z, np.ones(len(scan_x))]).T
-    proj_idx[proj_y, proj_x] = indices
-
-    return proj_range, proj_vertex, proj_idx
-
-def bev_projection(current_vertex, proj_H=32, proj_W=900, max_range=80, cut_height=True, lower_bound=10, upper_bound=20):
-
-    depth = np.linalg.norm(current_vertex[:, :3], 2, axis=1)
-    scan_z_tmp = current_vertex[:, 2]
-    if cut_height:
-        current_vertex = current_vertex[(depth > 0) & (depth < max_range) & (scan_z_tmp > lower_bound) & (
-                scan_z_tmp < upper_bound)]
-        depth = depth[(depth > 0) & (depth < max_range) & (scan_z_tmp > lower_bound) & (scan_z_tmp < upper_bound)]
-    else:
-        current_vertex = current_vertex[(depth > 0) & (depth < max_range)]
-        depth = depth[(depth > 0) & (depth < max_range)]
-
-    scan_x = current_vertex[:, 0]
-    scan_y = current_vertex[:, 1]
-    scan_z = current_vertex[:, 2]
-
-    if scan_z.shape[0] == 0:
-        return np.full((proj_H, proj_W), 0, dtype=np.float32)
-
-    yaw = -np.arctan2(scan_y, scan_x)
-    pitch = np.arcsin(scan_z / depth)
-
-    scan_r = depth * np.cos(pitch)
-
-    proj_x = 0.5 * (yaw / np.pi + 1.0)
-    proj_y = scan_r / max_range
-
-    proj_x = proj_x * proj_W
-    proj_y = proj_y * proj_H
-
-    proj_x = np.floor(proj_x)
-    proj_x = np.minimum(proj_W - 1, proj_x)
-    proj_x = np.maximum(0, proj_x).astype(np.int32)
-
-    proj_y = np.floor(proj_y)
-    proj_y = np.minimum(proj_H - 1, proj_y)
-    proj_y = np.maximum(0, proj_y).astype(np.int32)
-
-    order = np.argsort(scan_z)
-    scan_z = scan_z[order]
-    proj_y = proj_y[order]
-    proj_x = proj_x[order]
-
-    kitti_lidar_height = 2
-
-    proj_bev = np.full((proj_H, proj_W), 0,
-                        dtype=np.float32)
-
-    proj_bev[proj_y, proj_x] = scan_z + abs(kitti_lidar_height)
-
-    return proj_bev
 
 class KittiCVTDataset(PointCloudDataset):
     r"""
@@ -143,112 +26,47 @@ class KittiCVTDataset(PointCloudDataset):
                  config=None):
 
         self.root = root = config.kitti_dir
-        self.gp_rem = config.gp_rem
-        self.pnv_prep = config.pnv_preprocessing
-
-        self.fov_up = config.fov_up
-        self.fov_down = config.fov_down
-        self.proj_H = config.proj_H
-        self.proj_W = config.proj_W
-        self.range_thresh = config.range_th
-        self.height_thresh = config.height_th
-
-        self.min_range = min(self.range_thresh)
-        self.max_range = max(self.range_thresh)
-        self.min_height = min(self.height_thresh)
-        self.max_height = max(self.height_thresh)
-
-        self.timer = Timer()
 
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
 
         logging.info("Initializing KittiDataset")
         logging.info(f"Loading the subset {phase} from {root}")
-        if self.gp_rem:
-            logging.info("Dataloader initialized with Ground Plane removal.")
 
-        sequences = config.kitti_data_split[phase]
-        for drive_id in sequences:
+        self.sequences = config.kitti_data_split[phase]
+        for drive_id in self.sequences:
             drive_id = int(drive_id)
-            inames = self.get_all_scan_ids(drive_id, is_sorted=True)
-            for start_time in inames:
-                self.files.append((drive_id, start_time))
+            self.timestamps, self.ri_bev_files, self.poses = self.timestamps_files_and_gt(drive_id, is_sorted=True)
+            print(f"Loaded {len(self.ri_bev_files)} ri-bev files from sequence {drive_id}")
+            for query_id, ri_bev_file in enumerate(self.ri_bev_files):
+                self.files.append((drive_id, query_id, ri_bev_file))
 
-    def get_all_scan_ids(self, drive_id, is_sorted=False):
+    def timestamps_files_and_gt(self, drive_id, is_sorted=False):
         fnames = glob.glob(
             self.root + '/sequences/%02d/velodyne/*.bin' % drive_id)
         assert len(
             fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
         inames = [int(os.path.split(fname)[-1][:-4]) for fname in fnames]
         if is_sorted:
-            return sorted(inames)
-        return inames
-
-    def get_velodyne_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
-        return fname
+            inames = sorted(inames)
+        
+        timestamps = np.array(load_timestamps(self.root + '/sequences/%02d/times.txt' % drive_id))
+        _, poses = load_poses_from_txt(os.path.join(self.root + '/sequences/%02d/poses.txt' % drive_id))
+        
+        return timestamps, inames, poses
     
-    def get_npz_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/ri_bev/%06d.npz' % (drive, t)
+    def get_npz_fn(self, drive, query_id):
+        fname = self.root + '/sequences/%02d/ri_bev/%06d.npz' % (drive, query_id)
         return fname
-
-    def get_ri_bev_tensor(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
-        current_vertex = data2xyzi(np.fromfile(fname))[0]
-        ri_bev = np.zeros((len(self.range_thresh)+len(self.height_thresh), self.proj_H, self.proj_W))
-        for i in range(len(self.range_thresh)-1):
-            nearer_bound = self.range_thresh[i]
-            farer_bound = self.range_thresh[i+1]
-            lower_bound = self.height_thresh[i]
-            upper_bound = self.height_thresh[i+1]
-            proj_range, _, _ = range_projection(current_vertex,
-                                                fov_up=self.fov_up,
-                                                fov_down=self.fov_down,
-                                                proj_H=self.proj_H,
-                                                proj_W=self.proj_W,
-                                                max_range=self.max_range,
-                                                cut_range=True,
-                                                lower_bound=nearer_bound,
-                                                upper_bound=farer_bound)
-            proj_bev = bev_projection(current_vertex,
-                                      proj_H=self.proj_H,
-                                      proj_W=self.proj_W,
-                                      max_range=self.max_range,
-                                      cut_height=True,
-                                      lower_bound=lower_bound,
-                                      upper_bound=upper_bound)
-
-            ri_bev[int(i+1),:,:] = proj_range
-            ri_bev[int(i+1+len(self.range_thresh)), :, :] = proj_bev
-
-            ri_bev[0, :, :], _, _ = range_projection(current_vertex,
-                                                    fov_up=self.fov_up,
-                                                    fov_down=self.fov_down,
-                                                    proj_H=self.proj_H,
-                                                    proj_W=self.proj_W,
-                                                    max_range=self.max_range,
-                                                    cut_range=True,
-                                                    lower_bound=self.min_range,
-                                                    upper_bound=self.max_range)
-            ri_bev[len(self.range_thresh), :, :] = bev_projection(current_vertex,
-                                                            proj_H=self.proj_H,
-                                                            proj_W=self.proj_W,
-                                                            max_range=self.max_range,
-                                                            cut_height=True,
-                                                            lower_bound=self.min_height,
-                                                            upper_bound=self.max_height)
-        return ri_bev
     
     def get_ri_bev_tensor_at_file(self, drive_id, pc_id):
         return np.load(self.get_npz_fn(drive_id, pc_id))['ri_bev']
 
     def __getitem__(self, idx):
-        drive_id = self.files[idx][0]
-        t0 = self.files[idx][1]
+        drive_id, query_id, ri_bev_file  = self.files[idx]
 
-        xyz0_th = self.get_ri_bev_tensor(drive_id, t0)
-        meta_info = {'drive': drive_id, 't0': t0}
+        xyz0_th = self.get_ri_bev_tensor_at_file(drive_id, query_id)
+        meta_info = {'drive': drive_id, 'query_id': query_id}
 
         return (xyz0_th,
                 meta_info)
@@ -270,20 +88,6 @@ class KittiCVTTupleDataset(KittiCVTDataset):
         self.positives_per_query = config.positives_per_query
         self.negatives_per_query = config.negatives_per_query
         self.quadruplet = False
-        self.gp_rem = config.gp_rem
-        self.pnv_prep = config.pnv_preprocessing
-
-        self.fov_up = config.fov_up
-        self.fov_down = config.fov_down
-        self.proj_H = config.proj_H
-        self.proj_W = config.proj_W
-        self.range_thresh = config.range_th
-        self.height_thresh = config.height_th
-
-        self.min_range = min(self.range_thresh)
-        self.max_range = max(self.range_thresh)
-        self.min_height = min(self.height_thresh)
-        self.max_height = max(self.height_thresh)
 
         self.timer = Timer_for_general()
 
@@ -302,19 +106,18 @@ class KittiCVTTupleDataset(KittiCVTDataset):
         self.dict_3m = json.load(open(tuple_dir + config.kitti_3m_json, "r"))
         self.dict_20m = json.load(open(tuple_dir + config.kitti_20m_json, "r"))
         self.kitti_seq_lens = config.kitti_seq_lens
+        self.poses = {}
+        self.timestamps = {}
+        
         for drive_id in sequences:
             drive_id = int(drive_id)
-            fnames = glob.glob(
-                root + '/sequences/%02d/velodyne/*.bin' % drive_id)
-            assert len(
-                fnames) > 0, f"Make sure that the path {root} has data {drive_id}"
-            inames = sorted([int(os.path.split(fname)[-1][:-4])
-                            for fname in fnames])
-
-            for query_id in inames:
+            timestamps, self.ri_bev_files, poses = self.timestamps_files_and_gt(drive_id, is_sorted=True)
+            self.timestamps[drive_id] = timestamps
+            self.poses[drive_id] = poses
+            for query_id, ri_bev_file in enumerate(self.ri_bev_files):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)
-                self.files.append((drive_id, query_id, positives, negatives))
+                self.files.append((drive_id, query_id, positives, negatives, timestamps[query_id]))
 
     def get_positives(self, sq, index):
         sq = str(int(sq))

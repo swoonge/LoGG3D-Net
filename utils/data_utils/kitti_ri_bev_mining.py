@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from gen_ri_bev import *
+from tqdm import tqdm
 
 def range_projection(current_vertex, fov_up=10.67, fov_down=-30.67, proj_H=32, proj_W=900, max_range=80, cut_range=True,
                      lower_bound=0.1, upper_bound=6):
@@ -196,11 +197,15 @@ class KittiPreprocessor:
                 os.makedirs(output_dir, exist_ok=True)
             pc_ids = [int(os.path.splitext(f)[0]) for f in os.listdir(velodyne_dir) if f.endswith('.bin')]
             pc_ids.sort()
-            for pc_id in pc_ids:
+            print('*'*50)
+            print(f'* process for seq {drive_id}')
+            pc_ids_progress_bar = tqdm(pc_ids, desc="* ", leave=True)
+            for pc_id in pc_ids_progress_bar:
                 ri_bev_tensor = self.get_ri_bev_tensor(drive_id, pc_id)
                 output_fname = os.path.join(output_dir, f'{pc_id:06d}.npz')
                 np.savez_compressed(output_fname, ri_bev=ri_bev_tensor)
-                print(f'Saved: {output_fname}')
+                tqdm.write(f'* Saved: {output_fname}')
+            print('*'*50)
 
 
 # Example usage
@@ -208,8 +213,8 @@ if __name__ == '__main__':
     base_dir = '/media/vision/SSD1/Datasets/kitti/dataset/sequences'
     range_thresh = [0, 15, 30, 45, 80]  # Example thresholds
     height_thresh = [-3, -1.5, 0, 1.5, 5]    # Example thresholds
-    fov_up = 3.5
-    fov_down = -25
+    fov_up = 3.0
+    fov_down = -25.0
     proj_H = 64
     proj_W = 900
     min_range = min(range_thresh)
