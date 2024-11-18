@@ -115,6 +115,7 @@ class Evaluator:
             self.sequence = f"{'2012-02-05'}"
             self.args.nclt_data_split['test'] = ['2012-02-05']
             self.dataset_path = '/media/vision/SSD1/Datasets/NCLT'
+            self.args.dataset = 'NCLTRiBevDataset'
         
         self.thresholds = np.linspace(thresholds_linspace[0], thresholds_linspace[1], thresholds_linspace[2])#[300:600]
         self.thresholds_num = len(self.thresholds)
@@ -184,9 +185,12 @@ class Evaluator:
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
-            elif self.args.pipeline.split('_')[0] == 'OverlapTransformer':
+            elif 'OverlapTransformer' in self.args.pipeline.split('_')[0]:
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
-                input_t = input_t.unsqueeze(0).unsqueeze(0)
+                if batch[0][0].shape[0] > 1:
+                    input_t = input_t.unsqueeze(0)[:, 0, :, :].unsqueeze(1)
+                else:
+                    input_t = input_t.unsqueeze(0).unsqueeze(0)
                 output_desc = self.model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))

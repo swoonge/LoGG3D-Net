@@ -30,7 +30,7 @@ class KittiCVTDataset(PointCloudDataset):
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
 
-        logging.info("Initializing KittiDataset")
+        logging.info("Initializing KittiCVTDataset")
         logging.info(f"Loading the subset {phase} from {root}")
 
         self.sequences = config.kitti_data_split[phase]
@@ -97,7 +97,7 @@ class KittiCVTTupleDataset(KittiCVTDataset):
         PointCloudDataset.__init__(
             self, phase, random_rotation, random_occlusion, random_scale, config)
 
-        logging.info("Initializing KittiTupleDataset")
+        logging.info("Initializing KittiCVTTupleDataset")
         logging.info(f"Loading the subset {phase} from {root}")
 
         sequences = config.kitti_data_split[phase]

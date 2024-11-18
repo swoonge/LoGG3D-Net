@@ -60,8 +60,13 @@ if __name__ == '__main__':
         # ['OverlapTransformer/2024-10-10_15-48-19', ['epoch_best_34.pth']],
         # ['CVTNet/2024-11-07_16-15-36', ['epoch_best_42.pth', 'epoch_69.pth', 'epoch_141.pth']],
         # ['CVTNet/pretrained_NCLT',['pretrained_model.pth.tar']]
-        ['OverlapTransformer/2024-10-10_14-06-46',['epoch_best_27.pth', 'epoch_best_43.pth']],
-        ['CVTNet/2024-11-14_15-43-53',['epoch_29.pth','epoch_best_26.pth', 'epoch_best_65.pth', 'epoch_best_74.pth']]
+        # ['OverlapTransformer/2024-10-10_14-06-46',['epoch_best_27.pth', 'epoch_best_43.pth']],
+        # ['CVTNet/2024-11-15_20-06-45',['epoch_best_21.pth', 'epoch_best_46.pth', 'epoch_24.pth']], # kitti00
+        # ['CVTNet/2024-11-16_07-14-07',['epoch_best_11.pth', 'epoch_best_31.pth', 'epoch_26.pth', 'epoch_36.pth']], # kitti08
+        # ['CVTNet/2024-11-15_20-02-02',['epoch_best_28.pth', 'epoch_best_36.pth', 'epoch_best_42.pth', 'epoch_30.pth']], # NCLT
+        # ['OverlapTransformer/2024-11-15_10-49-15',['epoch_best_32.pth', 'epoch_best_47.pth']],
+        # ['OverlapTransformer/2024-11-15_10-50-28',['epoch_best_32.pth', 'epoch_best_26.pth']],
+        ['OverlapTransformer_nclt/2024-11-18_11-05-57',['epoch_46.pth', 'epoch_best_48.pth']],
     ]
     linspace = [0.001, 1.0, 1000]
     diff_ch = None #[64,16]

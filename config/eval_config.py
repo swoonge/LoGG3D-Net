@@ -63,7 +63,7 @@ data_arg.add_argument("--pnv_preprocessing", type=str2bool,
 data_arg.add_argument('--kitti_dir', type=str, default='/media/vision/SSD1/Datasets/kitti/dataset/',
                       help="Path to the KITTI odometry dataset")
 data_arg.add_argument('--kitti_data_split', type=dict, default={
-    'train': [1, 3, 4, 5, 6, 7, 8, 9, 10],
+    'train': [3, 4, 5, 6, 7, 8, 9, 10],
     'val': [2],
     'test': [0]
 })

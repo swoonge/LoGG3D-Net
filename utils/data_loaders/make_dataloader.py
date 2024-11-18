@@ -14,12 +14,13 @@ from utils.data_loaders.gm.gm_rangeimage_dataset import *
 from utils.data_loaders.kitti.kitti_cvt_dataset import *
 from utils.data_loaders.nclt.nclt_dataset import *
 from utils.data_loaders.nclt.nclt_ri_bev_dataset import *
+from utils.data_loaders.nclt.nclt_sparse_dataset import *
 
 
 ALL_DATASETS = [
     KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
     MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset,
-    KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset
+    KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset, KittiSparseTupleDataset, NCLTPointSparseTupleDataset
     
 ]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}

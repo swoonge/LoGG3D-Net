@@ -12,8 +12,8 @@ def str2bool(v):
 
 # Training
 trainer_arg = add_argument_group('Train')
-# LOGG3D, OverlapTransformer, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo, CVTNet
-trainer_arg.add_argument('--pipeline', type=str, default='CVTNet')
+# LOGG3D, OverlapTransformer, OverlapTransformer_nclt, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo, CVTNet
+trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer_nclt')
 trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
@@ -53,10 +53,10 @@ opt_arg.add_argument('--scheduler', type=str, default='step')
 
 # Dataset specific configurations
 data_arg = add_argument_group('Data')
-# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset # KittiCVTTupleDataset
-# NCLTRiBevTupleDataset
+# KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset # KittiCVTTupleDataset # NCLTPointSparseTupleDataset
+# NCLTRiBevTupleDataset # NCLTPointSparseTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiCVTTupleDataset')
+                      default='NCLTRiBevTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)

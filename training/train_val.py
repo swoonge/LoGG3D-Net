@@ -53,7 +53,6 @@ def main():
     point_loss_function = train_utils.get_point_loss_function(cfg)
     optimizer = train_utils.get_optimizer(cfg, model.parameters())
     scheduler = train_utils.get_scheduler(cfg, optimizer)
-    print("Scheduler: ", scheduler)
 
     if cfg.resume_training:
         resume_filename = cfg.resume_checkpoint
@@ -111,6 +110,9 @@ def main():
                 break
             if cfg.pipeline == 'LOGG3D':
                 batch_st = batch[0].to(device)
+                print("Features dtype:", batch_st.F.dtype)  # Features의 dtype
+                print("Coordinates dtype:", batch_st.C.dtype)  # Coordinates의 dtype
+
                 if not batch[1]['pos_pairs'].ndim == 2:
                     continue
                 output = model(batch_st)
@@ -136,7 +138,10 @@ def main():
                     print("Batch size is not 6")
                     continue
                 
-                current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]
+                if batch.shape[1] > 1:
+                    current_batch = batch.type(torch.FloatTensor).to(device)[:, 0, :, :].unsqueeze(1)
+                else:
+                    current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]
                 output = model(current_batch)
 
                 ## loss
@@ -223,7 +228,10 @@ def main():
                         print("Batch size is not 6")
                         continue
                     
-                    current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]
+                    if batch.shape[1] > 1:
+                        current_batch = batch.type(torch.FloatTensor).to(device)[:, 0, :, :].unsqueeze(1)
+                    else:
+                        current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]
                     output = model(current_batch)
 
                     ## loss
