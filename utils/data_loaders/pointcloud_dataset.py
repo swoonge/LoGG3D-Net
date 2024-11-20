@@ -1,4 +1,4 @@
-import sys
+import sys, logging
 import os
 import torch
 import numpy as np
@@ -15,6 +15,9 @@ class PointCloudDataset(torch.utils.data.Dataset):
                  random_occlusion=False,
                  random_scale=False,
                  config=None):
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.INFO)
+
         self.phase = phase
         self.files = []
 
@@ -24,6 +27,8 @@ class PointCloudDataset(torch.utils.data.Dataset):
         self.random_occlusion = random_occlusion
         self.random_rotation = random_rotation
         self.rotation_range = config.rotation_range
+
+        self.logger.info(f"Loading the {phase} phase of the dataset.")
         if random_rotation:
             print('***********************Dataloader initialized with Random Rotation. ')
         if random_occlusion:

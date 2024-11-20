@@ -28,16 +28,15 @@ class NCLTRiBevDataset(PointCloudDataset):
                  config=None):
 
         self.root = root = config.nclt_dir
-        self.timer = Timer()
+        self.gp_rem = config.gp_rem
+        self.pnv_prep = config.pnv_preprocessing
 
-        PointCloudDataset.__init__(
-            self, phase, random_rotation, random_occlusion, random_scale, config)
+        PointCloudDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
 
         logging.info("Initializing NCLTDataset")
         logging.info(f"Loading the subset {phase} from {root}")
 
         self.sequences = config.nclt_data_split[phase]
-
         for sequence_id in self.sequences:
             # scan_files = self.get_all_scan_ids(sequence_id)
             self.timestamps, self.ri_bev_files, self.poses = self.timestamps_files_and_gt(root, sequence_id)

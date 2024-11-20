@@ -4,6 +4,9 @@ from pathlib import Path
 from typing import Tuple, Optional
 import scipy
 import pandas as pd
+from torchsparse import SparseTensor
+import plotly.graph_objs as go
+import plotly.io as pio
 
 def p_dist(pose1, pose2, threshold=3):
     dist = np.linalg.norm(pose1 - pose2)
@@ -51,12 +54,24 @@ def load_kitti_poses(data_path, seq):
     print('Ground truth poses are not avaialble.')
 
   poses = np.array(poses)
-  if 'Tr' in calib: # calib['Tr'] is the transformation matrix from LiDAR to camera
-    Tr = np.linalg.inv(calib['Tr'])
-    poses_lidar = [np.dot(Tr, pose) for pose in poses]
-    poses = np.array(poses_lidar)
-    
+  # if 'Tr' in calib: # calib['Tr'] is the transformation matrix from LiDAR to camera
+  #   Tr = np.linalg.inv(calib['Tr'])
+  #   poses_lidar = [np.dot(pose, Tr) for pose in poses]
+  #   poses = np.array(poses_lidar)
+
+  cam2velo = get_kitti_Cam2Vel()
+  poses_lidar = [np.dot(pose, cam2velo) for pose in poses]
+  poses = np.array(poses_lidar)
+
   return poses
+
+def get_kitti_Cam2Vel():
+  R = np.array([7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
+                  -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
+                  ]).reshape(3, 3)
+  t = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
+  cam2velo = np.vstack((np.hstack([R, t]), [0, 0, 0, 1]))
+  return cam2velo
 
 def load_kitti_calib(filepath):
     """
@@ -100,8 +115,9 @@ def load_kitti_timestamps(data_path, seq):
     return np.asarray(times_listn)
 
 def load_kitti_files(data_path, drive_id, is_sorted=False):
-  fnames = glob.glob(data_path + '/sequences/'+ drive_id +'/velodyne/*.bin')
+  fnames = os.path.join(data_path, 'sequences', drive_id, 'velodyne', '*.bin')
   assert len(fnames) > 0, f"Make sure that the path {data_path} has drive id: {drive_id}"
+  fnames = glob.glob(fnames)
   inames = [(os.path.split(fname)[-1]) for fname in fnames]
   if is_sorted:
       return sorted(inames)
@@ -403,6 +419,44 @@ def multi_layer_bev_projection(current_vertex, proj_H=32, proj_W=900, max_range=
   proj_bev[proj_y, proj_x] = scan_z + abs(kitti_lidar_height)
 
   return proj_bev
+
+def visualize_pc(pc, color='blue'):
+  if isinstance(pc, SparseTensor):
+      xyz = pc.F
+  else:
+      xyz = pc
+
+  x = xyz[:, 0]
+  y = xyz[:, 1]
+  z = xyz[:, 2]
+
+  # 축의 범위 계산
+  max_range = max(x.max() - x.min(), y.max() - y.min(), z.max() - z.min())
+  mid_x = (x.max() + x.min()) / 2
+  mid_y = (y.max() + y.min()) / 2
+  mid_z = (z.max() + z.min()) / 2
+
+  trace = go.Scatter3d(
+      x=x, y=y, z=z,
+      mode='markers',
+      marker=dict(
+          size=3,
+          color=color,
+          opacity=0.8
+      )
+  )
+
+  layout = go.Layout(
+      title='3D Scatter Plot with Equal Scale on All Axes',
+      scene=dict(
+          xaxis=dict(range=[mid_x - max_range / 2, mid_x + max_range / 2], title='X Axis'),
+          yaxis=dict(range=[mid_y - max_range / 2, mid_y + max_range / 2], title='Y Axis'),
+          zaxis=dict(range=[mid_z - max_range / 2, mid_z + max_range / 2], title='Z Axis'),
+      )
+  )
+
+  fig = go.Figure(data=[trace], layout=layout)
+  pio.show(fig)
 
 ## 사용처가 없으면 삭제 예정
 def load_vertex(scan_path):

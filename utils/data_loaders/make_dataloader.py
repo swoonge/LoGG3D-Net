@@ -3,26 +3,31 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from torch.utils.data.sampler import Sampler
-from utils.data_loaders.mulran.mulran_sparse_dataset import *
-from utils.data_loaders.mulran.mulran_dataset import *
+
 from utils.data_loaders.kitti.kitti_sparse_dataset import *
 from utils.data_loaders.kitti.kitti_dataset import *
-from utils.data_loaders.kitti.kitti_rangeimage_dataset import *
-# from utils.data_loaders.gm.gm_sparse_dataset import *
-from utils.data_loaders.gm.gm_dataset import *
-from utils.data_loaders.gm.gm_rangeimage_dataset import *
-from utils.data_loaders.kitti.kitti_cvt_dataset import *
-from utils.data_loaders.nclt.nclt_dataset import *
-from utils.data_loaders.nclt.nclt_ri_bev_dataset import *
+
+# from utils.data_loaders.mulran.mulran_sparse_dataset import *
+# from utils.data_loaders.mulran.mulran_dataset import *
+# from utils.data_loaders.kitti.kitti_sparse_dataset import *
+# from utils.data_loaders.kitti.kitti_dataset import *
+# from utils.data_loaders.kitti.kitti_ri_dataset import *
+# # from utils.data_loaders.gm.gm_sparse_dataset import *
+# from utils.data_loaders.gm.gm_dataset import *
+# from utils.data_loaders.gm.gm_rangeimage_dataset import *
+# from utils.data_loaders.kitti.kitti_ri_bev_dataset import *
+# from utils.data_loaders.nclt.nclt_dataset import *
+# from utils.data_loaders.nclt.nclt_ri_bev_dataset import *
 from utils.data_loaders.nclt.nclt_sparse_dataset import *
 
 
-ALL_DATASETS = [
-    KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
-    MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset,
-    KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset, KittiSparseTupleDataset, NCLTPointSparseTupleDataset
-    
-]
+# ALL_DATASETS = [
+#     KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiRangeImageDataset, KittiRangeImageTupleDataset,
+#     MulRanDataset, MulRanTupleDataset, MulRanSparseTupleDataset, MulRanPointSparseTupleDataset, GMRangeImageDataset, GMRangeImageTupleDataset,
+#     KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset, KittiSparseTupleDataset, NCLTPointSparseTupleDataset
+# ]
+
+ALL_DATASETS = [KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, NCLTPointSparseTupleDataset]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}
 
 

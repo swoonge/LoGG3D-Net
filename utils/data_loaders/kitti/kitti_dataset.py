@@ -1,16 +1,11 @@
-import os
-import sys
-import glob
-import random
-import numpy as np
-import logging
-import json
-from utils.data_utils.range_projection import range_projection
-
+import os, sys, random, logging, json
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
-from utils.misc_utils import Timer
-from utils.o3d_tools import *
+import numpy as np
+
 from utils.data_loaders.pointcloud_dataset import *
+from utils.data_utils.utils import *
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
 class KittiDataset(PointCloudDataset):
     r"""
@@ -23,47 +18,80 @@ class KittiDataset(PointCloudDataset):
                  random_occlusion=False,
                  random_scale=False,
                  config=None):
+        """
+        KittiDataset 클래스의 초기화 메서드입니다.
 
-        self.root = root = config.kitti_dir
-        self.gp_rem = config.gp_rem
-        self.pnv_prep = config.pnv_preprocessing
-        self.timer = Timer()
+        Args:
+            phase (str): 데이터셋의 단계 (train, val, test 등).
+            random_rotation (bool, optional): 무작위 회전을 적용할지 여부. 기본값은 False.
+            random_occlusion (bool, optional): 무작위 폐색을 적용할지 여부. 기본값은 False.
+            random_scale (bool, optional): 무작위 스케일링을 적용할지 여부. 기본값은 False.
+            config (object, optional): 데이터셋 설정을 포함하는 객체.
 
-        PointCloudDataset.__init__(
-            self, phase, random_rotation, random_occlusion, random_scale, config)
+        Attributes:
+            root (str): KITTI 데이터셋의 루트 디렉토리.
+            gp_rem (bool): Ground Plane 제거 여부.
+            pnv_prep (bool): PointNet++ 전처리 여부.
+            id_file_dicts (dict): 드라이브 ID와 파일 매핑을 저장하는 딕셔너리.
+            files (list): 드라이브 ID와 쿼리 ID의 튜플 리스트.
+        """
 
-        logging.info("Initializing KittiDataset")
-        logging.info(f"Loading the subset {phase} from {root}")
+        self.root = config.kitti_dir  # KITTI 데이터셋의 루트 디렉토리 설정
+        self.gp_rem = config.gp_rem  # Ground Plane 제거 여부 설정
+        self.pnv_prep = config.pnv_preprocessing  # PointNet++ 전처리 여부 설정
+
+        PointCloudDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)  # 부모 클래스 초기화
+
+        self.logger.info("Initializing KittiDataset")  # 데이터셋 초기화 로그 출력
         if self.gp_rem:
-            logging.info("Dataloader initialized with Ground Plane removal.")
+            self.logger.info("Dataloader initialized with Ground Plane removal.")  # Ground Plane 제거 활성화 로그 출력
 
-        sequences = config.kitti_data_split[phase]
-        for drive_id in sequences:
-            drive_id = int(drive_id)
-            inames = self.get_all_scan_ids(drive_id, is_sorted=True)
-            for start_time in inames:
-                self.files.append((drive_id, start_time))
+        self.id_file_dicts = {}  # 드라이브 ID와 파일 매핑을 저장하는 딕셔너리 초기화
+        self.files = []
 
-    def get_all_scan_ids(self, drive_id, is_sorted=False):
-        fnames = glob.glob(
-            self.root + '/sequences/%02d/velodyne/*.bin' % drive_id)
-        assert len(
-            fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
-        inames = [int(os.path.split(fname)[-1][:-4]) for fname in fnames]
-        if is_sorted:
-            return sorted(inames)
-        return inames
+        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]  # 드라이브 ID 리스트 생성
+        for drive_id in drive_ids:
+            files = load_kitti_files(self.root, drive_id, is_sorted=True)  # 드라이브 ID에 해당하는 파일 리스트 로드
+            id_file_dict = {}  # 쿼리 ID와 파일 매핑을 저장하는 딕셔너리 초기화
+            for query_id, file in enumerate(files):
+                self.files.append((drive_id, query_id))  # 드라이브 ID와 쿼리 ID 튜플을 파일 리스트에 추가
+                id_file_dict[query_id] = file  # 쿼리 ID와 파일 매핑을 딕셔너리에 추가
+            self.id_file_dicts[drive_id] = id_file_dict  # 드라이브 ID와 파일 매핑 딕셔너리를 전체 딕셔너리에 추가
 
-    def get_velodyne_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
+    def get_velodyne_fn(self, drive, file):
+        '''
+        주어진 드라이브와 파일 이름을 사용하여 Velodyne 파일의 전체 경로를 반환합니다.
+        
+        매개변수:
+        - drive (str): 드라이브 번호 또는 이름. ("00", ...)
+        - file (str): 확장자 명을 포함한 파일 이름. (*.bin)
+        
+        반환값:
+        - str: Velodyne 파일의 전체 경로.
+        '''
+        fname = os.path.join(self.root, 'sequences', drive, 'velodyne', file)
         return fname
-    
-    def get_rangeimage_fn(self, drive, t):
-        fname = self.root + '/sequences/%02d/depth_map/%06d.png' % (drive, t)
-        return fname
 
-    def get_pointcloud_tensor(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
+    def get_pointcloud_np(self, drive_id, pc_id):
+        """
+        주어진 drive_id와 pc_id에 해당하는 포인트 클라우드를 numpy 배열로 반환합니다.
+
+        매개변수:
+        drive_id (int): 드라이브 ID.
+        pc_id (int): 포인트 클라우드 ID.
+
+        반환값:
+        numpy.ndarray: 포인트 클라우드 데이터가 포함된 numpy 배열.
+
+        동작:
+        - Velodyne 파일에서 포인트 클라우드 데이터를 읽어옵니다.
+        - Ground plane 제거가 활성화된 경우, 평면 분할을 통해 지면 포인트를 제거합니다.
+        - PNV 전처리가 활성화된 경우, 전처리를 수행합니다.
+        - 랜덤 회전이 활성화된 경우, 포인트 클라우드를 랜덤하게 회전시킵니다.
+        - 랜덤 가림이 활성화된 경우, 포인트 클라우드를 일부 가립니다.
+        - 랜덤 스케일링이 활성화된 경우, 포인트 클라우드를 랜덤하게 스케일링합니다.
+        """
+        fname = self.get_velodyne_fn(drive_id, self.id_file_dicts[drive_id][pc_id])
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
 
         if self.gp_rem:
@@ -86,20 +114,26 @@ class KittiDataset(PointCloudDataset):
 
         return xyzr
 
-    def get_rangeimage_tensor(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
-        xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
-        range_image, _, _, _ = range_projection(xyzr, fov_up=3, fov_down=-25.0, proj_H=64, proj_W=900, max_range=80)
-        return range_image
-
     def __getitem__(self, idx):
-        drive_id = self.files[idx][0]
-        t0 = self.files[idx][1]
+        """
+        주어진 인덱스에 해당하는 데이터를 반환합니다.
 
-        xyz0_th = self.get_pointcloud_tensor(drive_id, t0)
-        meta_info = {'drive': drive_id, 't0': t0}
+        Args:
+            idx (int): 데이터의 인덱스.
 
-        return (xyz0_th,
+        Returns:
+            tuple: 쿼리 포인트 클라우드와 메타 정보가 포함된 튜플.
+                - query (numpy.ndarray): 쿼리 포인트 클라우드 데이터.
+                - meta_info (dict): 메타 정보 딕셔너리.
+                    - drive_id (int): 드라이브 ID.
+                    - query_id (int): 쿼리 ID.
+        """
+        drive_id, query_id = self.files[idx]
+
+        query = self.get_pointcloud_np(drive_id, query_id)
+        meta_info = {'drive_id': drive_id, 'query_id': query_id}
+
+        return (query,
                 meta_info)
 
 
@@ -115,164 +149,126 @@ class KittiTupleDataset(KittiDataset):
                  random_occlusion=False,
                  random_scale=False,
                  config=None):
-        self.root = root = config.kitti_dir
+        
+        KittiDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
+
         self.positives_per_query = config.positives_per_query
         self.negatives_per_query = config.negatives_per_query
         self.quadruplet = False
-        self.gp_rem = config.gp_rem
-        self.pnv_prep = config.pnv_preprocessing
         if config.train_loss_function == 'quadruplet':
             self.quadruplet = True
 
-        PointCloudDataset.__init__(
-            self, phase, random_rotation, random_occlusion, random_scale, config)
+        self.logger.info("Initializing KittiTupleDataset")
 
-        logging.info("Initializing KittiTupleDataset")
-        logging.info(f"Loading the subset {phase} from {root}")
-
-        sequences = config.kitti_data_split[phase]
-        tuple_dir = os.path.join(os.path.dirname(
-            __file__), '../../../config/kitti_tuples/')
+        tuple_dir = os.path.join(os.path.dirname(__file__), '../../../config/kitti_tuples/')
         self.dict_3m = json.load(open(tuple_dir + config.kitti_3m_json, "r"))
         self.dict_20m = json.load(open(tuple_dir + config.kitti_20m_json, "r"))
         self.kitti_seq_lens = config.kitti_seq_lens
-        for drive_id in sequences:
-            drive_id = int(drive_id)
-            fnames = glob.glob(
-                root + '/sequences/%02d/velodyne/*.bin' % drive_id)
-            assert len(
-                fnames) > 0, f"Make sure that the path {root} has data {drive_id}"
-            inames = sorted([int(os.path.split(fname)[-1][:-4])
-                            for fname in fnames])
 
-            for query_id in inames:
+        self.files = []
+        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
+        for drive_id in drive_ids:
+            files = load_kitti_files(self.root, drive_id, is_sorted=True)
+            for query_id, file in enumerate(files):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)
                 self.files.append((drive_id, query_id, positives, negatives))
 
-    def get_positives(self, sq, index):
-        sq = str(int(sq))
-        assert sq in self.dict_3m.keys(), f"Error: Sequence {sq} not in json."
-        sq_1 = self.dict_3m[sq]
-        if str(int(index)) in sq_1:
-            positives = sq_1[str(int(index))]
+    def get_positives(self, drive_id, query_id):
+        assert drive_id in self.dict_3m.keys(), f"Error: Sequence {drive_id} not in json."
+        sq_1 = self.dict_3m[drive_id]
+        if str(int(query_id)) in sq_1:
+            positives = sq_1[str(int(query_id))]
         else:
             positives = []
-        if index in positives:
-            positives.remove(index)
+        if query_id in positives:
+            positives.remove(query_id)
         return positives
 
-    def get_negatives(self, sq, index):
-        sq = str(int(sq))
-        assert sq in self.dict_20m.keys(), f"Error: Sequence {sq} not in json."
-        sq_2 = self.dict_20m[sq]
-        all_ids = set(np.arange(self.kitti_seq_lens[sq]))
-        neg_set_inv = sq_2[str(int(index))]
+    def get_negatives(self, drive_id, query_id):
+        assert drive_id in self.dict_20m.keys(), f"Error: Sequence {drive_id} not in json."
+        drive_id_2 = self.dict_20m[drive_id]
+        all_ids = set(np.arange(self.kitti_seq_lens[str(int(drive_id))]))
+        neg_set_inv = drive_id_2[str(int(query_id))]
         neg_set = all_ids.difference(neg_set_inv)
         negatives = list(neg_set)
-        if index in negatives:
-            negatives.remove(index)
+        if query_id in negatives:
+            negatives.remove(query_id)
         return negatives
 
     def get_other_negative(self, drive_id, query_id, sel_positive_ids, sel_negative_ids):
         # Dissimillar to all pointclouds in triplet tuple.
-        all_ids = range(self.kitti_seq_lens[str(drive_id)])
-        neighbour_ids = sel_positive_ids
+        all_ids = range(self.kitti_seq_lens[str(int(drive_id))])
+        neighbour_ids = sel_positive_ids.copy()
         for neg in sel_negative_ids:
             neg_postives_files = self.get_positives(drive_id, neg)
             for pos in neg_postives_files:
                 neighbour_ids.append(pos)
         possible_negs = list(set(all_ids) - set(neighbour_ids))
-        assert len(
-            possible_negs) > 0, f"No other negatives for drive {drive_id} id {query_id}"
+        assert len(possible_negs) > 0, f"No other negatives for drive {drive_id} id {query_id}"
         other_neg_id = random.sample(possible_negs, 1)
         return other_neg_id[0]
 
     def __getitem__(self, idx):
-        drive_id, query_id = self.files[idx][0], self.files[idx][1]
-        positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
+        drive_id, query_id, positive_ids, negative_ids = self.files[idx]
 
-        sel_positive_ids = random.sample(
-            positive_ids, self.positives_per_query)
-        sel_negative_ids = random.sample(
-            negative_ids, self.negatives_per_query)
+        if len(positive_ids) < self.positives_per_query:
+            positive_ids = positive_ids + positive_ids
+        if len(negative_ids) < self.negatives_per_query:
+            negative_ids = negative_ids + negative_ids
+
+        selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
+        selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
         positives, negatives, other_neg = [], [], None
 
-        query_th = self.get_pointcloud_tensor(drive_id, query_id)
-        for sp_id in sel_positive_ids:
-            positives.append(self.get_pointcloud_tensor(drive_id, sp_id))
-        for sn_id in sel_negative_ids:
-            negatives.append(self.get_pointcloud_tensor(drive_id, sn_id))
+        query = self.get_pointcloud_np(drive_id, query_id)
+        for pos_id in selected_positive_ids:
+            positives.append(self.get_pointcloud_np(drive_id, pos_id))
+        for neg_id in selected_negative_ids:
+            negatives.append(self.get_pointcloud_np(drive_id, neg_id))
 
-        meta_info = {'drive': drive_id, 'query_id': query_id}
-
+        meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
         if not self.quadruplet:
-            return (query_th,
+            return (query,
                     positives,
                     negatives,
                     meta_info)
         else:  # For Quadruplet Loss
-            other_neg_id = self.get_other_negative(
-                drive_id, query_id, sel_positive_ids, sel_negative_ids)
-            other_neg_th = self.get_pointcloud_tensor(drive_id, other_neg_id)
-            return (query_th,
+            other_neg_id = self.get_other_negative(drive_id, query_id, selected_positive_ids, selected_negative_ids)
+            other_neg_th = self.get_pointcloud_np(drive_id, other_neg_id)
+            meta_info['other_neg_id'] = other_neg_id
+            return (query,
                     positives,
                     negatives,
                     other_neg_th,
                     meta_info)
 
+import logging
+import json
+from matplotlib import pyplot as plt
+from config.train_config import *
 
-#####################################################################################
-# Load poses
-#####################################################################################
+# Config 객체 생성
+config = get_config()
 
-def transfrom_cam2velo(Tcam):
-    R = np.array([7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-                  -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
-                  ]).reshape(3, 3)
-    t = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
-    cam2velo = np.vstack((np.hstack([R, t]), [0, 0, 0, 1]))
+# 데이터셋 테스트
+def test_nclt_datasets():
+    # # NCLTDataset 테스트
+    kitti_dataset = KittiDataset(phase='test', config=config)
+    print("NCLTDataset 테스트 - 첫 번째 샘플:")
+    query_tensor, meta_info = kitti_dataset[0]
+    print("XYZ tensor:", query_tensor.shape)
+    print("Metadata:", meta_info)
 
-    return Tcam @ cam2velo
+    kitti_tuple_dataset = KittiTupleDataset(phase='train', config=config)
+    print("\KittiTupleDataset 테스트 - 두 번째 샘플:")
+    query_tensor, positives, negatives, other_negative, meta_info = kitti_tuple_dataset[0]
+    print("Query tensor:", query_tensor.shape)
+    print("Positives:", len(positives), positives[0].shape)
+    print("Negatives:", len(negatives), negatives[0].shape)
+    print("Negatives:", other_negative.shape)
+    print("Metadata:", meta_info)
 
-
-def load_poses_from_txt(file_name):
-    """
-    Modified function from: https://github.com/Huangying-Zhan/kitti-odom-eval/blob/master/kitti_odometry.py
-    """
-    f = open(file_name, 'r')
-    s = f.readlines()
-    f.close()
-    transforms = {}
-    positions = []
-    for cnt, line in enumerate(s):
-        P = np.eye(4)
-        line_split = [float(i) for i in line.split(" ") if i != ""]
-        withIdx = len(line_split) == 13
-        for row in range(3):
-            for col in range(4):
-                P[row, col] = line_split[row*4 + col + withIdx]
-        if withIdx:
-            frame_idx = line_split[0]
-        else:
-            frame_idx = cnt
-        transforms[frame_idx] = transfrom_cam2velo(P)
-        positions.append([P[0, 3], P[2, 3], P[1, 3]])
-    return transforms, np.asarray(positions)
-
-
-#####################################################################################
-# Load timestamps
-#####################################################################################
-
-
-def load_timestamps(file_name):
-    # file_name = data_dir + '/times.txt'
-    file1 = open(file_name, 'r+')
-    stimes_list = file1.readlines()
-    s_exp_list = np.asarray([float(t[-4:-1]) for t in stimes_list])
-    times_list = np.asarray([float(t[:-2]) for t in stimes_list])
-    times_listn = [times_list[t] * (10**(s_exp_list[t]))
-                   for t in range(len(times_list))]
-    file1.close()
-    return times_listn
+# 이 파일을 직접 실행했을 때만 테스트 함수 실행
+if __name__ == "__main__":
+    test_nclt_datasets()

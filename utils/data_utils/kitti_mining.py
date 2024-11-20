@@ -177,7 +177,7 @@ class Kitti_processor:
             timestamps = self.timestamps[drive_id]
 
             if drive_id not in positive_dict:
-                positive_dict[str(int(drive_id)).zfill(1)] = {}
+                positive_dict[str(int(drive_id)).zfill(2)] = {}
 
             translations = np.array([pose[:3, 3] for pose in poses]) # Extract (n, 3) positions
     
@@ -187,13 +187,13 @@ class Kitti_processor:
             # 모든 시간 간의 차이를 계산
             time_diffs = np.abs(timestamps[:, np.newaxis] - timestamps[np.newaxis, :])
 
-            for t1 in tqdm(range(len(timestamps)), desc=f"* [{iter_i}/{len(drive_ids)}]Processing drive {drive_id}"):
+            for query_id in tqdm(range(len(poses)), desc=f"* [{iter_i}/{len(drive_ids)}]Processing drive {drive_id}"):
                 # 거리와 시간 차이 조건에 맞는 인덱스 추출
-                valid_indices = np.where((p_dists[t1] <= d_thresh) & (time_diffs[t1] >= t_thresh))[0]
+                valid_indices = np.where((p_dists[query_id] <= d_thresh) & (time_diffs[query_id] >= t_thresh))[0]
                 if valid_indices.size > 0:
-                    positive_dict[str(int(drive_id)).zfill(1)][t1] = valid_indices.tolist()
+                    positive_dict[str(int(drive_id)).zfill(2)][query_id] = valid_indices.tolist()
                 else:
-                    positive_dict[str(int(drive_id)).zfill(1)][t1] = []
+                    positive_dict[str(int(drive_id)).zfill(2)][query_id] = []
 
         save_file_name = '{}/positive_sequence_D-{}_T-{}.json'.format(output_dir, d_thresh, t_thresh)
         with open(save_file_name, 'w') as f:

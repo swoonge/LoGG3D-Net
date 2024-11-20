@@ -13,7 +13,7 @@ from torchsparse import SparseTensor
 from utils.o3d_tools import *
 from utils.misc_utils import Timer, hashM
 from utils.data_loaders.pointcloud_dataset import *
-from utils.data_utils.utils_NCLT import *
+from utils.data_utils.utils import *
 from typing import Tuple, Optional
 import scipy
 from config.train_config import *
@@ -177,7 +177,7 @@ class NCLTSparseTupleDataset(PointCloudDataset):
     def get_pointcloud_sparse_tensor(self, sequence_id, scan_file):
         fname = self.get_velodyne_fn(sequence_id, scan_file)
         xyz, intensity = self.get_velo(fname)
-        xyzr = np.hstack([xyz, intensity.reshape(-1, 1)]).astype(np.float32)
+        xyzr = np.hstack([xyz, intensity.reshape(-1, 1)])
 
         if self.random_rotation:
             xyzr = self.random_rotate(xyzr)
@@ -189,7 +189,7 @@ class NCLTSparseTupleDataset(PointCloudDataset):
 
         pc_ = np.round(xyzr[:, :3] / self.voxel_size).astype(np.int32)
         pc_ -= pc_.min(0, keepdims=1)
-        feat_ = xyzr
+        feat_ = xyzr.astype(np.float32)
 
         _, inds = sparse_quantize(pc_,
                                   return_index=True,
@@ -438,7 +438,7 @@ class NCLTPointSparseTupleDataset(NCLTSparseTupleDataset):
     def get_other_negative(self, drive_id, query_id, sel_positive_ids, sel_negative_ids):
         # Dissimillar to all pointclouds in triplet tuple.
         all_ids = range(self.nclt_seq_lens[drive_id])
-        neighbour_ids = sel_positive_ids
+        neighbour_ids = sel_positive_ids.copy()
         for neg in sel_negative_ids:
             neg_postives_files = self.get_positives(drive_id, neg)
             for pos in neg_postives_files:
@@ -469,7 +469,7 @@ class NCLTPointSparseTupleDataset(NCLTSparseTupleDataset):
             xyzr = self.random_rotate(xyzr)
         pc_ = np.round(xyzr[:, :3] / self.voxel_size).astype(np.int32)
         pc_ -= pc_.min(0, keepdims=1)
-        feat_ = xyzr
+        feat_ = xyzr.astype(np.float32)
         _, inds = sparse_quantize(pc_,
                                   return_index=True,
                                   return_inverse=False)
@@ -525,12 +525,12 @@ class NCLTPointSparseTupleDataset(NCLTSparseTupleDataset):
             sequence_id, query_id, selected_positive_ids[0])
         positives.append(p_st)
 
-        for pos_id in selected_positive_ids:
+        for pos_id in selected_positive_ids[1:]:
             positives.append(self.get_pointcloud_sparse_tensor(sequence_id, self.id_file_dicts[sequence_id][pos_id]))
         for neg_id in selected_negative_ids:
             negatives.append(self.get_pointcloud_sparse_tensor(sequence_id, self.id_file_dicts[sequence_id][neg_id]))
 
-        meta_info = {'sequence': sequence_id, 'query_id': query_id, 'pos_pairs': pos_pairs, 'timestamp': timestamp}
+        meta_info = {'drive': sequence_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids, 'pos_pairs': pos_pairs}
 
         if not self.quadruplet:
             return {
@@ -563,21 +563,28 @@ config = get_config()
 # 데이터셋 테스트
 def test_nclt_datasets():
     # NCLTDataset 테스트
-    train_dataset = NCLTDataset(phase='train', config=config)
-    print("NCLTDataset 테스트 - 첫 번째 샘플:")
-    xyz_th, meta_info = train_dataset[0]
-    print("XYZ tensor:", xyz_th)
-    print("Metadata:", meta_info)
+    # train_dataset = NCLTDataset(phase='train', config=config)
+    # print("NCLTDataset 테스트 - 첫 번째 샘플:")
+    # xyz_th, meta_info = train_dataset[0]
+    # print("XYZ tensor:", xyz_th)
+    # print("Metadata:", meta_info)
 
     # NCLTTupleDataset 테스트
-    tuple_dataset = NCLTTupleDataset(phase='train', config=config)
+    tuple_dataset = NCLTPointSparseTupleDataset(phase='train', config=config)
     print("\nNCLTTupleDataset 테스트 - 첫 번째 샘플:")
-    query_tensor, positives, negatives, other_negative, meta_info = tuple_dataset[0]
+
+    query_tensor = tuple_dataset[0]['query']
+    positives = tuple_dataset[0]['positives']
+    negatives = tuple_dataset[0]['negatives']
+    other_negative = tuple_dataset[0]['other_neg']
+    meta_info = tuple_dataset[0]['meta_info']
     print("Query tensor:", query_tensor)
-    print("Positives:", positives)
-    print("Negatives:", negatives)
+    print("Positives:", len(positives), positives[0])
+    print("Negatives:", len(negatives), negatives[0])
     print("Negatives:", other_negative)
     print("Metadata:", meta_info)
+
+
 
 # 이 파일을 직접 실행했을 때만 테스트 함수 실행
 if __name__ == "__main__":

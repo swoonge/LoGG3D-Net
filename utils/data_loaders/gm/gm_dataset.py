@@ -5,7 +5,6 @@ import random
 import numpy as np
 import logging
 import json
-from utils.data_utils.range_projection import range_projection
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from utils.misc_utils import Timer

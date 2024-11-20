@@ -14,7 +14,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
-from utils.tictoc import Timer_for_general
+from utils.misc_utils import Timer
 
 from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
@@ -81,11 +81,11 @@ def main():
      
     best_val_loss = 1000000
 
-    timer_net = Timer_for_general()
+    timer_net = Timer()
 
-    timer_backprop = Timer_for_general()
+    timer_backprop = Timer()
 
-    timer_total = Timer_for_general()
+    timer_total = Timer()
 
     for epoch in range(starting_epoch, cfg.max_epoch):
         
@@ -110,8 +110,8 @@ def main():
                 break
             if cfg.pipeline == 'LOGG3D':
                 batch_st = batch[0].to(device)
-                print("Features dtype:", batch_st.F.dtype)  # Features의 dtype
-                print("Coordinates dtype:", batch_st.C.dtype)  # Coordinates의 dtype
+                # print("Features dtype:", batch_st.F.dtype)  # Features의 dtype
+                # print("Coordinates dtype:", batch_st.C.dtype)  # Coordinates의 dtype
 
                 if not batch[1]['pos_pairs'].ndim == 2:
                     continue
