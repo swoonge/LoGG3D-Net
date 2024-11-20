@@ -1,9 +1,7 @@
-import os
-import sys
-import random
+import os, sys, random
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 import numpy as np
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from torchsparse.utils.quantize import sparse_quantize
 from torchsparse import SparseTensor
 from utils.misc_utils import hashM
@@ -250,6 +248,11 @@ class KittiPointSparseTupleDataset(KittiSparseTupleDataset):
                 'other_neg': other_neg_st,
                 'meta_info': meta_info,
             }
+
+
+#####################################################################################
+# TEST
+#####################################################################################
 
 from config.train_config import *
 

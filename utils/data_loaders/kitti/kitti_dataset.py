@@ -1,40 +1,20 @@
-import os, sys, random, logging, json
+import os, sys, random, json
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 import numpy as np
 
 from utils.data_loaders.pointcloud_dataset import *
 from utils.data_utils.utils import *
 
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
-
 class KittiDataset(PointCloudDataset):
     r"""
     Generate single pointcloud frame from KITTI odometry dataset. 
     """
-
     def __init__(self,
                  phase,
                  random_rotation=False,
                  random_occlusion=False,
                  random_scale=False,
                  config=None):
-        """
-        KittiDataset 클래스의 초기화 메서드입니다.
-
-        Args:
-            phase (str): 데이터셋의 단계 (train, val, test 등).
-            random_rotation (bool, optional): 무작위 회전을 적용할지 여부. 기본값은 False.
-            random_occlusion (bool, optional): 무작위 폐색을 적용할지 여부. 기본값은 False.
-            random_scale (bool, optional): 무작위 스케일링을 적용할지 여부. 기본값은 False.
-            config (object, optional): 데이터셋 설정을 포함하는 객체.
-
-        Attributes:
-            root (str): KITTI 데이터셋의 루트 디렉토리.
-            gp_rem (bool): Ground Plane 제거 여부.
-            pnv_prep (bool): PointNet++ 전처리 여부.
-            id_file_dicts (dict): 드라이브 ID와 파일 매핑을 저장하는 딕셔너리.
-            files (list): 드라이브 ID와 쿼리 ID의 튜플 리스트.
-        """
 
         self.root = config.kitti_dir  # KITTI 데이터셋의 루트 디렉토리 설정
         self.gp_rem = config.gp_rem  # Ground Plane 제거 여부 설정
@@ -115,19 +95,6 @@ class KittiDataset(PointCloudDataset):
         return xyzr
 
     def __getitem__(self, idx):
-        """
-        주어진 인덱스에 해당하는 데이터를 반환합니다.
-
-        Args:
-            idx (int): 데이터의 인덱스.
-
-        Returns:
-            tuple: 쿼리 포인트 클라우드와 메타 정보가 포함된 튜플.
-                - query (numpy.ndarray): 쿼리 포인트 클라우드 데이터.
-                - meta_info (dict): 메타 정보 딕셔너리.
-                    - drive_id (int): 드라이브 ID.
-                    - query_id (int): 쿼리 ID.
-        """
         drive_id, query_id = self.files[idx]
 
         query = self.get_pointcloud_np(drive_id, query_id)
@@ -242,10 +209,12 @@ class KittiTupleDataset(KittiDataset):
                     negatives,
                     other_neg_th,
                     meta_info)
+        
 
-import logging
-import json
-from matplotlib import pyplot as plt
+#####################################################################################
+# TEST
+#####################################################################################
+
 from config.train_config import *
 
 # Config 객체 생성

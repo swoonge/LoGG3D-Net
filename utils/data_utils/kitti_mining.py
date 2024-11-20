@@ -156,13 +156,11 @@ class Kitti_processor:
         self.logger.info('Finished generating RI BEV images')
         print('*' * 100)
 
-    def gen_positive_dict_and_save_all(self, drive_ids, output_dir, d_thresh, t_thresh):
-        print('*' * 100)
-        self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh[0], t_thresh))
-        self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh[0], t_thresh)
-        print('*' * 100)
-        self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh[1], t_thresh))
-        self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh[1], t_thresh)
+    def gen_positive_dict_and_save_all(self, drive_ids, output_dir, d_threshs, t_thresh):
+        for d_thresh in d_threshs:
+            print('*' * 100)
+            self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh, t_thresh))
+            self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh, t_thresh)
         self.logger.info('Finished generating positive tuples')
         print('*' * 100)
 

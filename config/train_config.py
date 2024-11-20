@@ -116,7 +116,7 @@ data_arg.add_argument('--gm_dir', type=str,
 data_arg.add_argument("--gm_normalize_intensity", type=str2bool,
                       default=False, help="Normalize intensity return.")
 data_arg.add_argument('--gm_3m_json', type=str,
-                      default='positive_sequence_D-2_T-0.json')
+                      default='positive_sequence_D-1_T-0.json')
 data_arg.add_argument('--gm_20m_json', type=str,
                       default='positive_sequence_D-10_T-0.json')
 data_arg.add_argument('--gm_seq_lens', type=dict, default={

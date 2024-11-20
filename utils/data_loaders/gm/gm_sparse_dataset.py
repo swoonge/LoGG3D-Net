@@ -1,16 +1,13 @@
-import os
-import sys
-import random
-import numpy as np
-import logging
-from utils.data_utils.range_projection import range_projection
-
+import os, sys, random
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+import numpy as np
+
 from torchsparse.utils.quantize import sparse_quantize
 from torchsparse import SparseTensor
 from utils.misc_utils import hashM
 from utils.o3d_tools import *
-from utils.data_loaders.gm.gm_dataset import *
+from utils.data_loaders.gm.gm_dataset import GMTupleDataset
+from utils.data_utils.utils import *
 
 class GMSparseTupleDataset(GMTupleDataset):
     r"""
@@ -26,16 +23,15 @@ class GMSparseTupleDataset(GMTupleDataset):
                  random_scale=False,
                  config=None):
 
-        GMTupleDataset.__init__(
-            self, phase, random_rotation, random_occlusion, random_scale, config)
+        GMTupleDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
 
+        self.logger.info("GMSparseTupleDataset")
         self.voxel_size = config.voxel_size
         self.num_points = config.num_points
         self.phase = phase
-        self.gp_rem = config.gp_rem
 
     def get_pointcloud_sparse_tensor(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
+        fname = self.get_velodyne_fn(drive_id, self.id_file_dicts[drive_id][pc_id])
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
         if self.gp_rem:
             use_ransac = False
@@ -77,39 +73,33 @@ class GMSparseTupleDataset(GMTupleDataset):
         return sparse_pc
 
     def __getitem__(self, idx):
-        drive_id, query_id = self.files[idx][0], self.files[idx][1]
-        positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
+        drive_id, query_id, positive_ids, negative_ids = self.files[idx]
 
-        sel_positive_ids = random.sample(
-            positive_ids, self.positives_per_query)
-        sel_negative_ids = random.sample(
-            negative_ids, self.negatives_per_query)
+        selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
+        selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
         positives, negatives, other_neg = [], [], None
 
-        query_th = self.get_pointcloud_sparse_tensor(drive_id, query_id)
-        for sp_id in sel_positive_ids:
-            positives.append(
-                self.get_pointcloud_sparse_tensor(drive_id, sp_id))
-        for sn_id in sel_negative_ids:
-            negatives.append(
-                self.get_pointcloud_sparse_tensor(drive_id, sn_id))
+        query = self.get_pointcloud_sparse_tensor(drive_id, query_id)
+        for pos_id in selected_positive_ids:
+            positives.append(self.get_pointcloud_sparse_tensor(drive_id, pos_id))
+        for neg_id in selected_negative_ids:
+            negatives.append(self.get_pointcloud_sparse_tensor(drive_id, neg_id))
 
-        meta_info = {'drive': drive_id, 'query_id': query_id}
+        meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
 
         if not self.quadruplet:
             return {
-                'query': query_th,
+                'query': query,
                 'positives': positives,
                 'negatives': negatives,
                 'meta_info': meta_info
             }
         else:  # For Quadruplet Loss
-            other_neg_id = self.get_other_negative(
-                drive_id, query_id, sel_positive_ids, sel_negative_ids)
-            other_neg_th = self.get_pointcloud_sparse_tensor(
-                drive_id, other_neg_id)
+            other_neg_id = self.get_other_negative(drive_id, query_id, selected_positive_ids, selected_negative_ids)
+            other_neg_th = self.get_pointcloud_sparse_tensor(drive_id, other_neg_id)
+            meta_info['other_neg_id'] = other_neg_id
             return {
-                'query': query_th,
+                'query': query,
                 'positives': positives,
                 'negatives': negatives,
                 'other_neg': other_neg_th,
@@ -132,23 +122,15 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
                  random_scale=False,
                  config=None):
 
-        GMSparseTupleDataset.__init__(
-            self, phase, random_rotation, random_occlusion, random_scale, config)
+        GMSparseTupleDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
 
-        self.voxel_size = config.voxel_size
-        self.num_points = config.num_points
-        self.phase = phase
-        self.gp_rem = config.gp_rem
+        self.logger.info("GMPointSparseTupleDataset")
 
-    def transfrom_cam2velo(self, Tcam):
-        R = np.array([7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-                      -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
-                      ]).reshape(3, 3)
-        t = np.array([-4.069766e-03, -7.631618e-02, -
-                     2.717806e-01]).reshape(3, 1)
-        cam2velo = np.vstack((np.hstack([R, t]), [0, 0, 0, 1]))
+        self.poses_dict = {}
 
-        return Tcam @ cam2velo
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]  # 드라이브 ID 리스트 생성
+        for drive_id in self.drive_ids:
+            self.poses_dict[drive_id] = load_gm_poses(self.root, drive_id)
 
     def get_delta_pose(self, transforms):
         w_T_p1 = transforms[0]
@@ -157,16 +139,6 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         p1_T_w = np.linalg.inv(w_T_p1)
         p1_T_p2 = np.matmul(p1_T_w, w_T_p2)
         return p1_T_p2
-
-    def get_odometry(self, drive, indices=None, ext='.txt', return_all=False):
-        poses_path = self.root + '/poses/%02d.txt' % drive
-        poses_full = np.genfromtxt(poses_path)
-        return [self.odometry_to_positions(odometry) for odometry in poses_full[indices]]
-
-    def odometry_to_positions(self, odometry):
-        T_w_cam0 = odometry.reshape(3, 4)
-        T_w_cam0 = np.vstack((T_w_cam0, [0, 0, 0, 1]))
-        return T_w_cam0
 
     def generate_rand_negative_pairs(self, positive_pairs, hash_seed, N0, N1, N_neg=0):
         """
@@ -185,7 +157,7 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         return neg_pairs[np.logical_not(mask)]
 
     def get_sparse_pcd(self, drive_id, pc_id):
-        fname = self.get_velodyne_fn(drive_id, pc_id)
+        fname = self.get_velodyne_fn(drive_id, self.id_file_dicts[drive_id][pc_id])
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
         if self.gp_rem:
             use_ransac = True
@@ -204,9 +176,7 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         pc_ = np.round(xyzr[:, :3] / self.voxel_size).astype(np.int32)
         pc_ -= pc_.min(0, keepdims=1)
         feat_ = xyzr
-        _, inds = sparse_quantize(pc_,
-                                  return_index=True,
-                                  return_inverse=False)
+        _, inds = sparse_quantize(pc_, return_index=True, return_inverse=False)
         if len(inds) > self.num_points:
             inds = np.random.choice(inds, self.num_points, replace=False)
 
@@ -220,20 +190,16 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         p_pcd_temp = copy.deepcopy(p_pcd)
 
         matching_search_voxel_size = min(self.voxel_size*1.5, 0.1)
-        all_odometry = self.get_odometry(drive_id, [query_id, pos_id])
-        delta_T = self.get_delta_pose(all_odometry)
-        p_pcd.transform(delta_T)
-        reg = o3d.pipelines.registration.registration_icp(
-            p_pcd, q_pcd, 0.2, np.eye(4),
-            o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200))
-        p_pcd.transform(reg.transformation)
 
-        pos_pairs = get_matching_indices(
-            q_pcd, p_pcd, matching_search_voxel_size)
+        delta_T = self.get_delta_pose([self.poses_dict[drive_id][query_id], self.poses_dict[drive_id][pos_id]])
+        p_pcd.transform(delta_T)
+        reg = o3d.pipelines.registration.registration_icp(p_pcd, q_pcd, 0.2, np.eye(4),
+                                                        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+                                                        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200))
+        p_pcd.transform(reg.transformation)
+        pos_pairs = get_matching_indices(q_pcd, p_pcd, matching_search_voxel_size)
         if not pos_pairs.ndim == 2:
             print('No pos_pairs for ', query_id, 'in drive id: ', drive_id)
-
         return q_st, p_st, pos_pairs
 
     def __getitem__(self, idx):
@@ -241,35 +207,27 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         positive_ids, negative_ids = self.files[idx][2], self.files[idx][3]
 
         try:
-            sel_positive_ids = random.sample(
-                positive_ids, self.positives_per_query)
+            selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
         except ValueError:
-            logging.info(
-                f"Drive id:{drive_id}, query id:{query_id}, ppq:{self.positives_per_query}, num_pos:{len(positive_ids)}")
+            self.logger.info(f"Drive id:{drive_id}, query id:{query_id}, ppq:{self.positives_per_query}, num_pos:{len(positive_ids)}")
             # Temporary fix to handle len(positive_ids) == 0
             if len(positive_ids) > 0:
-                sel_positive_ids = random.choices(
-                    positive_ids, k=self.positives_per_query)
+                selected_positive_ids = random.choices(positive_ids, k=self.positives_per_query)
             else:
-                sel_positive_ids = [query_id for np_id in range(self.positives_per_query)]
+                selected_positive_ids = [query_id for np_id in range(self.positives_per_query)]
 
-        sel_negative_ids = random.sample(
-            negative_ids, self.negatives_per_query)
+        selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
         positives, negatives, other_neg = [], [], None
 
-        query_st, p_st, pos_pairs = self.get_point_tuples(
-            drive_id, query_id, sel_positive_ids[0])
+        query_st, p_st, pos_pairs = self.get_point_tuples(drive_id, query_id, selected_positive_ids[0])
         positives.append(p_st)
 
-        for sp_id in sel_positive_ids[1:]:
-            positives.append(
-                self.get_pointcloud_sparse_tensor(drive_id, sp_id))
-        for sn_id in sel_negative_ids:
-            negatives.append(
-                self.get_pointcloud_sparse_tensor(drive_id, sn_id))
+        for sp_id in selected_positive_ids[1:]:
+            positives.append(self.get_pointcloud_sparse_tensor(drive_id, sp_id))
+        for sn_id in selected_negative_ids:
+            negatives.append(self.get_pointcloud_sparse_tensor(drive_id, sn_id))
 
-        meta_info = {'drive': drive_id,
-                     'query_id': query_id, 'pos_pairs': pos_pairs}
+        meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids, 'pos_pairs': pos_pairs}
 
         if not self.quadruplet:
             return {
@@ -279,10 +237,9 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
                 'meta_info': meta_info
             }
         else:  # For Quadruplet Loss
-            other_neg_id = self.get_other_negative(
-                drive_id, query_id, sel_positive_ids, sel_negative_ids)
-            other_neg_st = self.get_pointcloud_sparse_tensor(
-                drive_id, other_neg_id)
+            other_neg_id = self.get_other_negative(drive_id, query_id, selected_positive_ids, selected_negative_ids)
+            other_neg_st = self.get_pointcloud_sparse_tensor(drive_id, other_neg_id)
+            meta_info['other_neg_id'] = other_neg_id
             return {
                 'query': query_st,
                 'positives': positives,
@@ -291,3 +248,51 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
                 'meta_info': meta_info,
             }
 
+
+
+#####################################################################################
+# TEST
+#####################################################################################
+
+from config.train_config import *
+
+# Config 객체 생성
+config = get_config()
+
+# 데이터셋 테스트
+def test_datasets():
+    # # KittiSparseTupleDataset 테스트
+    kitti_sparse_tuple_dataset = GMSparseTupleDataset(phase='train', config=config)
+    print("KittiSparseTupleDataset 테스트 - 첫 번째 샘플:")
+    query_tensor = kitti_sparse_tuple_dataset[0]['query']
+    positives = kitti_sparse_tuple_dataset[0]['positives']
+    negatives = kitti_sparse_tuple_dataset[0]['negatives']
+    other_negative = kitti_sparse_tuple_dataset[0]['other_neg']
+    meta_info = kitti_sparse_tuple_dataset[0]['meta_info']
+    print("Query tensor:", query_tensor, query_tensor.F.shape, query_tensor.C.shape)
+    print("Positives:", len(positives), positives[0])
+    print("Negatives:", len(negatives), negatives[0])
+    print("Negatives:", other_negative)
+    print("Metadata:", meta_info)
+
+    # visualize_pc(query_tensor)
+
+    from tqdm import tqdm
+
+    kitti_point_sparse_tuple_dataset = GMPointSparseTupleDataset(phase='train', config=config)
+    print("KittiPointSparseTupleDataset 테스트 - 첫 번째 샘플:")
+    query_tensor = kitti_point_sparse_tuple_dataset[1000]['query']
+    positives = kitti_point_sparse_tuple_dataset[1000]['positives']
+    negatives = kitti_point_sparse_tuple_dataset[1000]['negatives']
+    other_negative = kitti_point_sparse_tuple_dataset[1000]['other_neg']
+    meta_info = kitti_point_sparse_tuple_dataset[1000]['meta_info']
+    print("Query tensor:", query_tensor)
+    print("Positives:", len(positives), positives[0])
+    print("Negatives:", len(negatives), negatives[0])
+    print("Negatives:", other_negative)
+    print("Metadata:", meta_info)
+    kitti_point_sparse_tuple_dataset_progress = tqdm(kitti_point_sparse_tuple_dataset, total=len(kitti_point_sparse_tuple_dataset))
+
+# 이 파일을 직접 실행했을 때만 테스트 함수 실행
+if __name__ == "__main__":
+    test_datasets()

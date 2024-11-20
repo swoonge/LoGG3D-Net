@@ -8,6 +8,8 @@ from torchsparse.utils.quantize import sparse_quantize
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.o3d_tools import *
 
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+
 class PointCloudDataset(torch.utils.data.Dataset):
     def __init__(self,
                  phase,

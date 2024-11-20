@@ -157,13 +157,11 @@ class GM_processor:
         self.logger.info('Finished generating RI BEV images')
         print('*' * 100)
 
-    def gen_positive_dict_and_save_all(self, drive_ids, output_dir, d_thresh, t_thresh):
-        print('*' * 100)
-        self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh[0], t_thresh))
-        self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh[0], t_thresh)
-        print('*' * 100)
-        self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh[1], t_thresh))
-        self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh[1], t_thresh)
+    def gen_positive_dict_and_save_all(self, drive_ids, output_dir, d_threshs, t_thresh):
+        for d_thresh in d_threshs:
+            print('*' * 100)
+            self.logger.info('Generating positive tuples for d_thresh: {} and t_thresh: {}'.format(d_thresh, t_thresh))
+            self.get_positive_dict_matrix(drive_ids, output_dir, d_thresh, t_thresh)
         self.logger.info('Finished generating positive tuples')
         print('*' * 100)
 
@@ -178,7 +176,7 @@ class GM_processor:
             timestamps = self.timestamps[drive_id]
 
             if drive_id not in positive_dict:
-                positive_dict[str(int(drive_id)).zfill(1)] = {}
+                positive_dict[str(int(drive_id)).zfill(2)] = {}
 
             translations = np.array([pose[:3, 3] for pose in poses]) # Extract (n, 3) positions
     
@@ -192,9 +190,9 @@ class GM_processor:
                 # 거리와 시간 차이 조건에 맞는 인덱스 추출
                 valid_indices = np.where((p_dists[t1] <= d_thresh) & (time_diffs[t1] >= t_thresh))[0]
                 if valid_indices.size > 0:
-                    positive_dict[str(int(drive_id)).zfill(1)][t1] = valid_indices.tolist()
+                    positive_dict[str(int(drive_id)).zfill(2)][t1] = valid_indices.tolist()
                 else:
-                    positive_dict[str(int(drive_id)).zfill(1)][t1] = []
+                    positive_dict[str(int(drive_id)).zfill(2)][t1] = []
 
         save_file_name = '{}/positive_sequence_D-{}_T-{}.json'.format(output_dir, d_thresh, t_thresh)
         with open(save_file_name, 'w') as f:
@@ -248,6 +246,7 @@ if __name__ == '__main__':
 
     # tuple mining parameter
     nclt_tuples_output_dir = os.path.join(os.path.dirname(__file__), '../../config/gm_tuples/')
+    d_threshs = [1,2,3,7,10,20]
     t_thresh = 0
 
     preprocessor = GM_processor(base_dir, all_drive_ids, range_thresh, height_thresh, fov_up, fov_down, proj_H, proj_W, max_range, min_range, min_height, max_height)
@@ -265,4 +264,4 @@ if __name__ == '__main__':
 
     # tuple mining
     if args.tuple_mining:
-        preprocessor.gen_positive_dict_and_save_all(tuple_mining_drive_ids, nclt_tuples_output_dir, [3, 20], t_thresh)
+        preprocessor.gen_positive_dict_and_save_all(tuple_mining_drive_ids, nclt_tuples_output_dir, d_threshs, t_thresh)
