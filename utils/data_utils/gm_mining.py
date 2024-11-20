@@ -24,15 +24,7 @@ parser.add_argument('--no-tuple_mining', dest='tuple_mining', action='store_fals
 parser.add_argument('--gen_all', action='store_true', help="Generate all outputs")
 parser.set_defaults(gen_ri_bev=False, gen_ri=False, tuple_mining=False, gen_all=False)
 
-velodatatype = np.dtype({
-    'x': ('<u2', 0),
-    'y': ('<u2', 2),
-    'z': ('<u2', 4),
-    'i': ('u1', 6),
-    'l': ('u1', 7)})
-velodatasize = 8
-
-class NCLT_processor:
+class GM_processor:
     def __init__(self, base_dir, all_drive_ids, range_thresh, height_thresh, fov_up, fov_down, proj_H, proj_W, max_range, min_range, min_height, max_height):
         self.logger = logging.getLogger()
         self.base_dir = base_dir
@@ -53,31 +45,20 @@ class NCLT_processor:
         self.poses = {}
 
         for drive_id in tqdm(self.drive_ids, desc="* Load info for NCLT dataset"):
-            scan_files, poses, timestamps = load_nclt_files_poses_timestamps(self.base_dir, drive_id)
-            self.fnames[drive_id] = scan_files
-            self.poses[drive_id] = poses
-            self.timestamps[drive_id] = timestamps
+            self.fnames[drive_id] = load_kitti_files(self.base_dir, drive_id, True)
+            self.poses[drive_id] = load_gm_poses(self.base_dir, drive_id)
+            self.timestamps[drive_id] = load_kitti_timestamps(self.base_dir, drive_id)
 
-    def get_velodyne_fn(self, drive_id, fname):
-        return os.path.join(self.base_dir, 'velodyne_data', f'{drive_id}', 'velodyne_sync', fname)
-    
-    def data2xyzi(self, data, flip=True):
-        xyzil = data.view(velodatatype)
-        xyz = np.hstack([xyzil[axis].reshape([-1, 1]) for axis in ['x', 'y', 'z']])
-        xyz = xyz * 0.005 - 100.0
-
-        if flip:
-            R = np.eye(3)
-            R[2, 2] = -1
-            xyz = np.matmul(xyz, R)
-        return xyz, xyzil['i']
+    def get_velodyne_fn(self, drive, t):
+        return os.path.join(self.base_dir, 'sequences', drive, 'velodyne', t)
 
     def get_pointcloud_np(self, fpath):
-        return self.data2xyzi(np.fromfile(fpath))
+        return np.fromfile(fpath, dtype=np.float32).reshape(-1, 4)
         
     def get_ri_bev_np(self, drive_id, velodyne_file):
         fpath = self.get_velodyne_fn(drive_id, velodyne_file)
-        current_vertex = self.get_pointcloud_np(fpath)[0]
+        current_vertex = self.get_pointcloud_np(fpath)
+        current_vertex = current_vertex[:, :3]
         ri_bev = np.zeros((len(self.range_thresh) + len(self.height_thresh), self.proj_H, self.proj_W))
 
         for i in range(len(self.range_thresh) - 1):
@@ -122,6 +103,7 @@ class NCLT_processor:
                                                               cut_height=True,
                                                               lower_bound=self.min_height,
                                                               upper_bound=self.max_height)
+
         return ri_bev
 
     def gen_ri_bev_and_save_all(self, drive_ids):
@@ -130,7 +112,7 @@ class NCLT_processor:
         time.sleep(1)
         for drive_id in drive_ids:
             self.logger.info(f'Generating RI BEV images for the following drives: {drive_id}')
-            output_dir = os.path.join(self.base_dir, 'velodyne_data', f'{drive_id}', 'ri_bev')
+            output_dir = os.path.join(self.base_dir, 'sequences', drive_id, 'ri_bev')
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir, exist_ok=True)
 
@@ -149,8 +131,7 @@ class NCLT_processor:
 
     def get_ri_np(self, drive_id, velodyne_file):
         fpath = self.get_velodyne_fn(drive_id, velodyne_file)
-        current_vertex, current_vertex_intensity = self.get_pointcloud_np(fpath)
-        current_vertex = np.concatenate([current_vertex, current_vertex_intensity[:, None]], axis=1)
+        current_vertex = self.get_pointcloud_np(fpath)
         range_image, _, _, _ = range_projection(current_vertex, fov_up=self.fov_up, fov_down=self.fov_down, proj_H=self.proj_H, proj_W=self.proj_W, max_range=self.max_range)
         return range_image
 
@@ -160,7 +141,7 @@ class NCLT_processor:
         time.sleep(1)
         for drive_id in drive_ids:
             self.logger.info(f'Generating Range Images for the following drives: {drive_id}')
-            output_dir = os.path.join(self.base_dir, 'velodyne_data', f'{drive_id}', 'range_images')
+            output_dir = os.path.join(self.base_dir, 'sequences', drive_id, 'range_images')
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir, exist_ok=True)
 
@@ -171,7 +152,7 @@ class NCLT_processor:
                 file_name = fname.split('.')[0]
                 output_fname = os.path.join(output_dir, f'{file_name}.npy')
                 np.save(output_fname, ri_np)
-                tqdm.write(f'* Saved: {output_fname}')
+                tqdm.write(f'* Saved: {output_dir}')
                 
         self.logger.info('Finished generating RI BEV images')
         print('*' * 100)
@@ -197,7 +178,7 @@ class NCLT_processor:
             timestamps = self.timestamps[drive_id]
 
             if drive_id not in positive_dict:
-                positive_dict[drive_id] = {}
+                positive_dict[str(int(drive_id)).zfill(1)] = {}
 
             translations = np.array([pose[:3, 3] for pose in poses]) # Extract (n, 3) positions
     
@@ -211,9 +192,9 @@ class NCLT_processor:
                 # 거리와 시간 차이 조건에 맞는 인덱스 추출
                 valid_indices = np.where((p_dists[t1] <= d_thresh) & (time_diffs[t1] >= t_thresh))[0]
                 if valid_indices.size > 0:
-                    positive_dict[drive_id][t1] = valid_indices.tolist()
+                    positive_dict[str(int(drive_id)).zfill(1)][t1] = valid_indices.tolist()
                 else:
-                    positive_dict[drive_id][t1] = []
+                    positive_dict[str(int(drive_id)).zfill(1)][t1] = []
 
         save_file_name = '{}/positive_sequence_D-{}_T-{}.json'.format(output_dir, d_thresh, t_thresh)
         with open(save_file_name, 'w') as f:
@@ -246,34 +227,18 @@ class NCLT_processor:
 # Example usage
 if __name__ == '__main__':
     args = parser.parse_args()
-    base_dir = '/media/vision/SSD1/Datasets/NCLT'
-    
-    all_drive_ids = ['2012-01-08', '2012-01-15', '2012-01-22', '2012-02-02', '2012-02-04', '2012-02-05', 
-                    '2012-02-12', '2012-02-18', '2012-02-19', '2012-03-17', '2012-03-25', '2012-03-31', 
-                    '2012-04-29', '2012-05-11', '2012-05-26', '2012-06-15', '2012-08-04', '2012-08-20', 
-                    '2012-09-28', '2012-10-28', '2012-11-04', '2012-11-16', '2012-11-17', '2012-12-01', 
-                    '2013-01-10', '2013-02-23', '2013-04-05']
-    gen_ri_bev_drive_ids = ['2012-01-08', '2012-01-15', '2012-01-22', '2012-02-02', '2012-02-04', '2012-02-05', 
-                            '2012-02-12', '2012-02-18', '2012-02-19', '2012-03-17', '2012-03-25', '2012-03-31', 
-                            '2012-04-29', '2012-05-11', '2012-05-26', '2012-06-15', '2012-08-04', '2012-08-20', 
-                            '2012-09-28', '2012-10-28', '2012-11-04', '2012-11-16', '2012-11-17', '2012-12-01', 
-                            '2013-01-10', '2013-02-23', '2013-04-05']
-    gen_ri_drive_ids = ['2012-01-08', '2012-01-15', '2012-01-22', '2012-02-02', '2012-02-04', '2012-02-05', 
-                            '2012-02-12', '2012-02-18', '2012-02-19', '2012-03-17', '2012-03-25', '2012-03-31', 
-                            '2012-04-29', '2012-05-11', '2012-05-26', '2012-06-15', '2012-08-04', '2012-08-20', 
-                            '2012-09-28', '2012-10-28', '2012-11-04', '2012-11-16', '2012-11-17', '2012-12-01', 
-                            '2013-01-10', '2013-02-23', '2013-04-05']
-    tuple_mining_drive_ids = ['2012-01-08', '2012-01-15', '2012-01-22', '2012-02-02', '2012-02-04', '2012-02-05', 
-                            '2012-02-12', '2012-02-18', '2012-02-19', '2012-03-17', '2012-03-25', '2012-03-31', 
-                            '2012-04-29', '2012-05-11', '2012-05-26', '2012-06-15', '2012-08-04', '2012-08-20', 
-                            '2012-09-28', '2012-10-28', '2012-11-04', '2012-11-16', '2012-11-17', '2012-12-01', 
-                            '2013-01-10', '2013-02-23', '2013-04-05']
+    base_dir = '/media/vision/SSD1/Datasets/gm_datasets'
+
+    all_drive_ids = [str(i).zfill(2) for i in range(0, 4)]
+    gen_ri_bev_drive_ids = [str(i).zfill(2) for i in range(0, 4)]
+    gen_ri_drive_ids = [str(i).zfill(2) for i in range(0, 4)]
+    tuple_mining_drive_ids = [str(i).zfill(2) for i in range(0, 4)]
 
     # gen ri_bev iamge parameter
-    range_thresh = [0, 15, 30, 45, 60]
-    height_thresh = [-4, 0, 4, 8, 12]
-    fov_up = 30.67
-    fov_down = -10.67
+    range_thresh = np.linspace(0, 50, 5)
+    height_thresh = np.linspace(-1.5, 2, 5)
+    fov_up = 4.0
+    fov_down = -6.5
     proj_H = 32
     proj_W = 900
     min_range = min(range_thresh)
@@ -282,10 +247,10 @@ if __name__ == '__main__':
     max_height = max(height_thresh)
 
     # tuple mining parameter
-    nclt_tuples_output_dir = os.path.join(os.path.dirname(__file__), '../../config/nclt_tuples/')
+    nclt_tuples_output_dir = os.path.join(os.path.dirname(__file__), '../../config/gm_tuples/')
     t_thresh = 0
 
-    preprocessor = NCLT_processor(base_dir, all_drive_ids, range_thresh, height_thresh, fov_up, fov_down, proj_H, proj_W, max_range, min_range, min_height, max_height)
+    preprocessor = GM_processor(base_dir, all_drive_ids, range_thresh, height_thresh, fov_up, fov_down, proj_H, proj_W, max_range, min_range, min_height, max_height)
     
     if args.gen_all:
         args.gen_ri_bev = args.gen_ri = args.tuple_mining = True
@@ -293,7 +258,7 @@ if __name__ == '__main__':
     # gen ri_bev image
     if args.gen_ri_bev:
         preprocessor.gen_ri_bev_and_save_all(gen_ri_bev_drive_ids)
-
+    
     # gen ri image
     if args.gen_ri:
         preprocessor.gen_ri_and_save_all(gen_ri_drive_ids)

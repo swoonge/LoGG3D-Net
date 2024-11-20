@@ -1,8 +1,22 @@
-import os, sys
+import os, sys, glob
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional
 import scipy
+import pandas as pd
+
+def p_dist(pose1, pose2, threshold=3):
+    dist = np.linalg.norm(pose1 - pose2)
+    if abs(dist) <= threshold:
+        return True
+    else:
+        return False
+
+def t_dist(t1, t2, threshold=10):
+    if abs(t1-t2) > threshold:
+        return True
+    else:
+        return False
 
 def load_kitti_poses(data_path, seq):
   """
@@ -73,6 +87,51 @@ def load_kitti_calib(filepath):
                 pass
 
     return data
+
+def load_kitti_timestamps(data_path, seq):
+    fpath = os.path.join(data_path, 'sequences', seq, 'times.txt')
+    fname = open(fpath, 'r+')
+    stimes_list = fname.readlines()
+    s_exp_list = np.asarray([float(t[-4:-1]) for t in stimes_list])
+    times_list = np.asarray([float(t[:-2]) for t in stimes_list])
+    times_listn = [times_list[t] * (10**(s_exp_list[t]))
+                   for t in range(len(times_list))]
+    fname.close()
+    return np.asarray(times_listn)
+
+def load_kitti_files(data_path, drive_id, is_sorted=False):
+  fnames = glob.glob(data_path + '/sequences/'+ drive_id +'/velodyne/*.bin')
+  assert len(fnames) > 0, f"Make sure that the path {data_path} has drive id: {drive_id}"
+  inames = [(os.path.split(fname)[-1]) for fname in fnames]
+  if is_sorted:
+      return sorted(inames)
+  return inames
+
+def load_gm_poses(data_path, seq):
+  """
+  Load gm poses for a given sequence.
+  Args:
+    data_path (str): The base directory path where the gm dataset is stored.
+    seq (int or str): The sequence number to load, formatted as a zero-padded string.
+  Returns:
+    np.ndarray: An array of poses in the LiDAR coordinate frame.
+  """
+  seq = str(seq).zfill(2)
+  poses_path = os.path.join(data_path, 'sequences', seq, 'poses.txt')
+
+  poses = []
+  try:
+    with open(poses_path, 'r') as f:
+      lines = f.readlines()
+      for line in lines:
+        T_w_cam0 = np.fromstring(line, dtype=float, sep=' ')
+        T_w_cam0 = T_w_cam0.reshape(3, 4)
+        T_w_cam0 = np.vstack((T_w_cam0, [0, 0, 0, 1]))
+        poses.append(T_w_cam0)
+  except FileNotFoundError:
+    print('Ground truth poses are not avaialble.')
+  
+  return np.array(poses)
 
 def load_nclt_files_poses_timestamps(root_path: str, sequence_id: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     """
