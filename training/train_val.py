@@ -1,4 +1,4 @@
-import os, sys, logging
+import os, sys, logging, argparse
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 ch = logging.StreamHandler(sys.stdout)
 logging.getLogger().setLevel(logging.INFO)
@@ -7,6 +7,11 @@ logging.basicConfig(format='%(asctime)s %(message)s',
                     handlers=[ch])
 logging.basicConfig(level=logging.INFO, format="")
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--server', action='store_true', help="Training on server")
+parser.set_defaults(server=False)
+args = parser.parse_args()
+
 from tqdm import tqdm
 from datetime import datetime
 
@@ -14,11 +19,13 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
-from utils.misc_utils import Timer
-
-from config.train_config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
+
+if args.server:
+    from config.train_config_server import get_config
+else:
+    from config.train_config import get_config
 
 cfg = get_config()
 
@@ -26,7 +33,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 
-    model_save_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'checkpoints', cfg.pipeline, f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}")
+    model_save_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'checkpoints', cfg.pipeline, f"{datetime.now(tz=None).strftime('%Y-%m-%d_%H-%M-%S')}_{cfg.experiment_name}")
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
     writer_save_path = os.path.join(model_save_path)
@@ -35,18 +42,17 @@ def main():
     writer = SummaryWriter(log_dir=writer_save_path)
 
     logger = logging.getLogger()
-    logging.info('\n' + ' '.join([sys.executable] + sys.argv))
-    logging.info('Slurm Job ID: ' + cfg.job_id)
-    logging.info('Training pipeline: ' + cfg.pipeline)
-    logging.info('SummartWriter Path: ' + writer_save_path)
+    logger.info('\n' + ' '.join([sys.executable] + sys.argv))
+    logger.info('Slurm Job ID: ' + cfg.job_id)
+    logger.info('Training pipeline: ' + cfg.pipeline)
+    logger.info('Model Save Path: ' + model_save_path)
+    logger.info('SummartWriter Path: ' + writer_save_path)
     log_config(cfg, logging)
-    cfg.experiment_name = f"{cfg.experiment_name}/{datetime.now(tz=None).strftime('%y-%m-%d_%H-%M-%S')}_{cfg.job_id}"
-    logging.info("Experiment Name: " + cfg.experiment_name)
 
     # Get model
     model = get_pipeline(cfg).to(device)
     n_params = sum([param.nelement() for param in model.parameters()])
-    logging.info('Number of model parameters: {}'.format(n_params))
+    logger.info('Number of model parameters: {}'.format(n_params))
 
     # Get train utils
     loss_function = train_utils.get_loss_function(cfg)
@@ -81,16 +87,10 @@ def main():
      
     best_val_loss = 1000000
 
-    timer_net = Timer()
-
-    timer_backprop = Timer()
-
-    timer_total = Timer()
-
     for epoch in range(starting_epoch, cfg.max_epoch):
         
         lr = optimizer.param_groups[0]['lr']
-        logging.info('**** EPOCH %03d ****' % (epoch) + ' LR: %06f' % (lr))
+        logger.info('**** EPOCH %03d ****' % (epoch) + ' LR: %06f' % (lr))
         running_loss = 0.0
         running_scene_loss = 0.0
         running_point_loss = 0.0
@@ -102,9 +102,6 @@ def main():
         train_loader_progress_bar = tqdm(train_loader, desc="Training", leave=True)
 
         for i, batch in enumerate(train_loader_progress_bar, 0):
-
-            timer_total.tic()
-            timer_net.tic()
             
             if i >= len(train_loader):
                 break
@@ -147,7 +144,6 @@ def main():
                 ## loss
                 scene_loss = loss_function(output, cfg)
                 running_scene_loss += scene_loss.item()
-                metric_epoch_loss += scene_loss.item()
                 loss = scene_loss
 
             elif cfg.pipeline.split('_')[0] == 'CVTNet':
@@ -163,34 +159,27 @@ def main():
                 ## loss
                 scene_loss = loss_function(output, cfg)
                 running_scene_loss += scene_loss.item()
-                metric_epoch_loss += scene_loss.item()
                 loss = scene_loss
-            timer_net.toc()
 
-            timer_backprop.tic()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            timer_backprop.toc()
 
             running_loss += loss.item()
             if (i % cfg.loss_log_step) == (cfg.loss_log_step - 1):
-                avg_loss = running_loss / cfg.loss_log_step
-                avg_scene_loss = running_scene_loss / cfg.loss_log_step
-                avg_point_loss = running_point_loss / cfg.loss_log_step
+                avg_loss = running_loss / i
+                avg_scene_loss = running_scene_loss / i
+                avg_point_loss = running_point_loss / i
 
                 lr = optimizer.param_groups[0]['lr']
                 tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr) + 
                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
-                # tqdm.write('Total time: {:.4f} Net time{:.4f} Backprop time{:.4f}'.format(timer_total.average_time(), timer_net.average_time(), timer_backprop.average_time()))
-                writer.add_scalar('training loss', avg_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
-            timer_total.toc()
-        metric_epoch_loss = metric_epoch_loss / len(train_loader)
+                
         if cfg.scheduler == 'ReduceLROnPlateau':
-            scheduler.step(metric_epoch_loss)
+            scheduler.step(running_loss / len(train_loader))
         else:
             scheduler.step()
 
@@ -283,7 +272,7 @@ def main():
         writer.add_scalar('lr', lr, epoch)
         writer.add_scalar('val loss', val_loss, epoch)
 
-    logging.info("Finished training.")
+    logger.info("Finished training.")
 
 if __name__ == "__main__":
     main()

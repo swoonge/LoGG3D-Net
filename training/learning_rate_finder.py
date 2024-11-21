@@ -1,8 +1,10 @@
-import torch
-from lr_finder import LRFinder
-
 import os, sys, logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+
+import torch
+
+from utils.model_utils.lr_finder import LRFinder
+
 ch = logging.StreamHandler(sys.stdout)
 logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(format='%(asctime)s %(message)s',

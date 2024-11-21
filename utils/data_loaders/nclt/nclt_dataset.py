@@ -46,7 +46,7 @@ class NCLTDataset(PointCloudDataset):
 
         drive_ids = config.nclt_data_split[phase]  # 드라이브 ID 리스트 생성
         for drive_id in drive_ids:
-            files, poses, timestamps = load_nclt_files_poses_timestamps(self.root, drive_id)  # 드라이브 ID에 해당하는 파일 리스트 로드
+            files, _, timestamps = load_nclt_files_poses_timestamps(self.root, drive_id)  # 드라이브 ID에 해당하는 파일 리스트 로드
             id_file_dict = {}  # 쿼리 ID와 파일 매핑을 저장하는 딕셔너리 초기화
             for query_id, file in enumerate(files):
                 self.files.append((drive_id, query_id))  # 드라이브 ID와 쿼리 ID 튜플을 파일 리스트에 추가
@@ -175,9 +175,9 @@ class NCLTTupleDataset(NCLTDataset):
 
         query_tensor = self.get_pointcloud_np(drive_id, query_id)
         for pos_id in selected_positive_ids:
-            positives.append(self.get_pointcloud_np(drive_id, query_id))
+            positives.append(self.get_pointcloud_np(drive_id, pos_id))
         for neg_id in selected_negative_ids:
-            negatives.append(self.get_pointcloud_np(drive_id, query_id))
+            negatives.append(self.get_pointcloud_np(drive_id, neg_id))
 
         meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
 
@@ -185,7 +185,7 @@ class NCLTTupleDataset(NCLTDataset):
             return query_tensor, positives, negatives, meta_info
         else:  # For Quadruplet Loss
             other_negative_id = self.get_other_negative(drive_id, query_id, selected_positive_ids, selected_negative_ids)
-            other_negative_tensor = self.get_pointcloud_np(drive_id, query_id)
+            other_negative_tensor = self.get_pointcloud_np(drive_id, other_negative_id)
             return query_tensor, positives, negatives, other_negative_tensor, meta_info
 
 

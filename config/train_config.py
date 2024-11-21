@@ -139,8 +139,8 @@ data_arg.add_argument('--nclt_seq_lens', type=dict, default={
     "2012-01-08": 27903, "2012-01-15": 33463, "2012-01-22": 25998, "2012-02-02": 29213, "2012-02-05":28054})
 data_arg.add_argument('--nclt_data_split', type=dict, default={
     'train': ["2012-01-08"],
-    'val': ["2012-02-05"],
-    'test': ["2012-02-05"]
+    'val': ["2012-01-08"],
+    'test': ["2012-01-08"]
 })
 
 
