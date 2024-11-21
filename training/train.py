@@ -134,8 +134,8 @@ def main():
                 if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
-                
-                if batch.shape[1] > 1:
+
+                if batch.ndim == 4:
                     current_batch = batch.type(torch.FloatTensor).to(device)[:, 0, :, :].unsqueeze(1)
                 else:
                     current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]
@@ -216,8 +216,7 @@ def main():
                     if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
-                    
-                    if batch.shape[1] > 1:
+                    if batch.ndim == 4:
                         current_batch = batch.type(torch.FloatTensor).to(device)[:, 0, :, :].unsqueeze(1)
                     else:
                         current_batch = torch.unsqueeze(batch, dim=1).type(torch.FloatTensor).to(device) # [6,1,64,900]

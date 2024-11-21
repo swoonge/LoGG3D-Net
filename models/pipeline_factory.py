@@ -17,8 +17,6 @@ def get_pipeline(cfg):
         pipeline = PointNetVLAD(global_feat=True, feature_transform=True, max_pool=False, output_dim=256, num_points=4096)
     elif cfg.pipeline == 'OverlapTransformer':
         pipeline = OverlapTransformer(channels=1, use_transformer=True)
-    elif cfg.pipeline == 'OverlapTransformer_nclt':
-        pipeline = OverlapTransformer(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapTransformer_resnet':
         pipeline = OverlapTransformer_resnet(channels=1, use_transformer=True, mode=cfg.OverlapTransformer_resnet_mode)
     elif cfg.pipeline == 'OverlapTransformer_ViT':

@@ -37,6 +37,8 @@ class OverlapTransformer(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
 
+        self.x_high = height
+
         self.use_transformer = use_transformer
 
         self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(1,1), bias=False) # [batch, 16, 60, 900]
@@ -98,17 +100,29 @@ class OverlapTransformer(nn.Module):
     def forward(self, x_l):
 
         out_l = self.relu(self.conv1(x_l))
+        # out_l = self.bn1(out_l)
         out_l = self.relu(self.conv2(out_l))
+        # out_l = self.bn2(out_l)
         out_l = self.relu(self.conv3(out_l))
+        # out_l = self.bn3(out_l)
         out_l = self.relu(self.conv4(out_l))
+        # out_l = self.bn4(out_l)
         out_l = self.relu(self.conv5(out_l))
+        # out_l = self.bn5(out_l)
         out_l = self.relu(self.conv6(out_l))
+        # out_l = self.bn6(out_l)
         out_l = self.relu(self.conv7(out_l))
+        # out_l = self.bn7(out_l)
         out_l = self.relu(self.conv8(out_l))
+        # out_l = self.bn8(out_l)
         out_l = self.relu(self.conv9(out_l))
-        out_l = self.relu(self.conv10(out_l))
-        # out_l = self.relu(self.conv11(out_l))
-
+        # out_l = self.bn9(out_l)
+        if self.x_high >= 32:
+            out_l = self.relu(self.conv10(out_l))
+            # out_l = self.bn10(out_l)
+        if self.x_high >= 64:
+            out_l = self.relu(self.conv11(out_l))
+            # out_l = self.bn11(out_l)
 
         out_l_1 = out_l.permute(0,1,3,2)
         out_l_1 = self.relu(self.convLast1(out_l_1))

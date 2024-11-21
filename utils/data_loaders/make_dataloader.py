@@ -6,6 +6,7 @@ from torch.utils.data.sampler import Sampler
 
 from utils.data_loaders.kitti.kitti_sparse_dataset import *
 from utils.data_loaders.kitti.kitti_dataset import *
+from utils.data_loaders.kitti.kitti_depth_image_dataset import *
 
 # from utils.data_loaders.mulran.mulran_sparse_dataset import *
 # from utils.data_loaders.mulran.mulran_dataset import *
@@ -18,7 +19,12 @@ from utils.data_loaders.kitti.kitti_dataset import *
 # from utils.data_loaders.kitti.kitti_ri_bev_dataset import *
 # from utils.data_loaders.nclt.nclt_dataset import *
 # from utils.data_loaders.nclt.nclt_ri_bev_dataset import *
+from utils.data_loaders.nclt.nclt_dataset import *
 from utils.data_loaders.nclt.nclt_sparse_dataset import *
+from utils.data_loaders.nclt.nclt_depth_image_dataset import *
+from utils.data_loaders.gm.gm_dataset import *
+from utils.data_loaders.gm.gm_sparse_dataset import *
+from utils.data_loaders.gm.gm_depth_image_dataset import *
 
 
 # ALL_DATASETS = [
@@ -27,7 +33,9 @@ from utils.data_loaders.nclt.nclt_sparse_dataset import *
 #     KittiCVTDataset, KittiCVTTupleDataset, NCLTDataset, NCLTRiBevDataset, NCLTRiBevTupleDataset, KittiSparseTupleDataset, NCLTPointSparseTupleDataset
 # ]
 
-ALL_DATASETS = [KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, NCLTPointSparseTupleDataset]
+ALL_DATASETS = [KittiDataset, KittiTupleDataset, KittiSparseTupleDataset, KittiPointSparseTupleDataset, KittiDepthImageDataset, KittiDepthImageTupleDataset,
+                NCLTDataset, NCLTTupleDataset, NCLTSparseTupleDataset, NCLTPointSparseTupleDataset, NCLTDepthImageDataset, NCLTDepthImageTupleDataset,
+                GMDataset, GMTupleDataset, GMSparseTupleDataset, GMPointSparseTupleDataset, GMDepthImageDataset, GMDepthImageTupleDataset]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}
 
 

@@ -12,8 +12,8 @@ def str2bool(v):
 
 # Training
 trainer_arg = add_argument_group('Train')
-# LOGG3D, OverlapTransformer, OverlapTransformer_nclt, OverlapTransformer_resnet, OverlapTransformer_ViT, OverlapTransformer_geo, CVTNet
-trainer_arg.add_argument('--pipeline', type=str, default='LOGG3D')
+# LOGG3D, OverlapTransformer, OverlapTransformer_geo, CVTNet
+trainer_arg.add_argument('--pipeline', type=str, default='OverlapTransformer')
 trainer_arg.add_argument('--OverlapTransformer_resnet_mode', type=str, default='original') 
 trainer_arg.add_argument('--resume_training', type=str2bool, default=False)
 trainer_arg.add_argument('--resume_checkpoint', type=str, default='') # 2024-09-03_18-32-21_LOGG3D_Default_0
@@ -56,7 +56,7 @@ data_arg = add_argument_group('Data')
 # KittiPointSparseTupleDataset(LoGG3D) #MulRanPointSparseTupleDataset # KittiRangeImageTupleDataset(ot) # GMRangeImageTupleDataset # KittiCVTTupleDataset # NCLTPointSparseTupleDataset
 # NCLTRiBevTupleDataset # NCLTPointSparseTupleDataset
 data_arg.add_argument('--dataset', type=str,
-                      default='KittiPointSparseTupleDataset')
+                      default='KittiDepthImageTupleDataset')
 data_arg.add_argument('--collation_type', type=str,
                       default='default')  # default#sparcify_list
 data_arg.add_argument('--num_points', type=int, default=35000)
@@ -164,8 +164,7 @@ data_arg.add_argument('--max_scale', type=float, default=1.0)
 
 # Misc
 misc_arg = add_argument_group('Misc')
-# misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D_Default_val')  ##############
-misc_arg.add_argument('--experiment_name', type=str, default='LOGG3D')  ##############
+misc_arg.add_argument('--experiment_name', type=str, default='OT_kitti08_no_bn')  ##############
 misc_arg.add_argument('--job_id', type=str, default='0')
 misc_arg.add_argument('--save_model_after_epoch', type=str2bool, default=True)
 misc_arg.add_argument('--eval_model_after_epoch', type=str2bool, default=False)
