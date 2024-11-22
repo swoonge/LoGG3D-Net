@@ -36,6 +36,7 @@ class OverlapNetTransformer(nn.Module):
             norm_layer = nn.BatchNorm2d
 
         self.x_high = height
+        self.query_size = 360 if height == 64 else 371
 
         self.use_transformer = use_transformer
 
@@ -43,7 +44,8 @@ class OverlapNetTransformer(nn.Module):
         self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5, 15), stride=(2,2), bias=False)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 15), stride=(2, 1), bias=False)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=(3, 15), stride=(2, 1), bias=False)
-        self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 12), stride=(2, 1), bias=False)
+        if self.x_high >= 64:
+            self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 15), stride=(2, 1), bias=False)
         self.conv5 = nn.Conv2d(64, 128, kernel_size=(2, 9), stride=(2, 1), bias=False)
         self.conv6 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
         self.conv7 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
@@ -65,7 +67,7 @@ class OverlapNetTransformer(nn.Module):
         self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast2 = norm_layer(1024)
 
-        self.linear = nn.Linear(128*360, 256)
+        self.linear = nn.Linear(128*self.query_size , 256)
 
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax()
@@ -74,7 +76,8 @@ class OverlapNetTransformer(nn.Module):
             NETVLAD
             add_batch_norm=False is needed in our work.
         """
-        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=360, cluster_size=64,
+        
+        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=self.query_size, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
 
@@ -87,20 +90,18 @@ class OverlapNetTransformer(nn.Module):
         self.bnl3 = norm_layer(256)
 
     def forward(self, x_l):
-
         out_l = self.relu(self.conv1(x_l))
         out_l = self.relu(self.conv2(out_l))
         out_l = self.relu(self.conv3(out_l))
-        out_l = self.relu(self.conv4(out_l))
+        if self.x_high >= 64:
+            out_l = self.relu(self.conv4(out_l))
         out_l = self.relu(self.conv5(out_l))
         out_l = self.relu(self.conv6(out_l))
         out_l = self.relu(self.conv7(out_l))
         out_l = self.relu(self.conv8(out_l))
         out_l = self.relu(self.conv9(out_l))
-        if self.x_high >= 32:
-            out_l = self.relu(self.conv10(out_l))
-        if self.x_high >= 64:
-            out_l = self.relu(self.conv11(out_l))
+        out_l = self.relu(self.conv10(out_l))
+        out_l = self.relu(self.conv11(out_l)) # [13, 128, 1, 371] if 32, [13, 128, 1, 360] if 64
 
         out_l_1 = out_l.permute(0,1,3,2)
         out_l_1 = self.relu(self.convLast1(out_l_1))

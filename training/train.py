@@ -24,7 +24,7 @@ from training import train_utils
 from config.config import get_config
 
 cfg = get_config()
-if args.server:
+if cfg.server:
     cfg.kitti_dir = '/data/datasets/kitti/dataset/'
     cfg.mulran_dir = '/data/datasets/MulRan/'
     cfg.gm_dir = '/data/datasets/gm_datasets/'

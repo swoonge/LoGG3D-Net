@@ -19,7 +19,10 @@ def get_pipeline(cfg):
     elif cfg.pipeline == 'OverlapTransformer':
         pipeline = OverlapTransformer(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapNetTransformer':
-        pipeline = OverlapNetTransformer(channels=1, use_transformer=True)
+        if "Kitti" in cfg.dataset:
+            pipeline = OverlapNetTransformer(channels=1, height=64, use_transformer=True)
+        elif "GM" in cfg.dataset:
+            pipeline = OverlapNetTransformer(channels=1, height=32, use_transformer=True)
     elif cfg.pipeline == 'OverlapTransformer_resnet':
         pipeline = OverlapTransformer_resnet(channels=1, use_transformer=True, mode=cfg.OverlapTransformer_resnet_mode)
     elif cfg.pipeline == 'OverlapTransformer_ViT':
