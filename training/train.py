@@ -21,13 +21,14 @@ from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
 from models.pipeline_factory import get_pipeline
 from training import train_utils
-
-if args.server:
-    from config.train_config_server import get_config
-else:
-    from config.config import get_config
+from config.config import get_config
 
 cfg = get_config()
+if args.server:
+    cfg.kitti_dir = '/data/datasets/kitti/dataset/'
+    cfg.mulran_dir = '/data/datasets/MulRan/'
+    cfg.gm_dir = '/data/datasets/gm_datasets/'
+    cfg.nclt_dir = '/data/datasets/NCLT/'
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

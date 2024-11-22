@@ -4,7 +4,7 @@ import json
 import numpy as np
 from tqdm import tqdm
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-from config.train_config import get_config
+from config.config import get_config
 cfg = get_config()
 
 

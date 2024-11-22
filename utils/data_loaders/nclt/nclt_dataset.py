@@ -6,9 +6,6 @@ from utils.data_loaders.pointcloud_dataset import *
 from utils.data_utils.utils import *
 
 from utils.o3d_tools import *
-from typing import Tuple, Optional
-import scipy
-from config.train_config import *
 
 velodatatype = np.dtype({
     'x': ('<u2', 0),
@@ -165,9 +162,9 @@ class NCLTTupleDataset(NCLTDataset):
         negative_ids = self.get_negatives(drive_id, query_id)
 
         if len(positive_ids) < self.positives_per_query:
-            positive_ids = positive_ids + positive_ids
+            positive_ids = (positive_ids * (self.positives_per_query // len(positive_ids) + 1))[:self.positives_per_query]
         if len(negative_ids) < self.negatives_per_query:
-            negative_ids = negative_ids + negative_ids
+            negative_ids = (negative_ids * (self.negatives_per_query // len(negative_ids) + 1))[:self.negatives_per_query]
 
         selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
         selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
@@ -193,7 +190,7 @@ class NCLTTupleDataset(NCLTDataset):
 # TEST
 #####################################################################################
 
-from config.train_config import *
+from config.config import *
 
 # Config 객체 생성
 config = get_config()

@@ -4,6 +4,7 @@
 # https://github.com/haomo-ai/OverlapTransformer/
 # Brief: OverlapTransformer modules for KITTI sequences
 
+
 import os
 import sys
 p = os.path.dirname(os.path.dirname((os.path.abspath(__file__))))
@@ -28,9 +29,9 @@ import torch.nn.functional as F
         norm_layer: None in our work for better model.
         use_transformer: Whether to use MHSA.
 """
-class OverlapTransformer(nn.Module):
+class OverlapNetTransformer(nn.Module):
     def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer = True):
-        super(OverlapTransformer, self).__init__()
+        super(OverlapNetTransformer, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
 
@@ -38,17 +39,19 @@ class OverlapTransformer(nn.Module):
 
         self.use_transformer = use_transformer
 
-        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(1,1), bias=False) # [batch, 16, 60, 900]
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3,1), stride=(2,1), bias=False) # [batch, 32, 29, 900]
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=(3,1), stride=(2,1), bias=False)
-        self.conv4 = nn.Conv2d(64, 64, kernel_size=(3,1), stride=(2,1), bias=False)
-        self.conv5 = nn.Conv2d(64, 128, kernel_size=(2,1), stride=(2,1), bias=False)
-        self.conv6 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv7 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv8 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv9 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv10 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv11 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
+        # [batch, 1, 64, 900]
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5, 15), stride=(2,2), bias=False)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 15), stride=(2, 1), bias=False)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=(3, 15), stride=(2, 1), bias=False)
+        self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 12), stride=(2, 1), bias=False)
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=(2, 9), stride=(2, 1), bias=False)
+        self.conv6 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
+        self.conv7 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
+        self.conv8 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
+        self.conv9 = nn.Conv2d(128, 128, kernel_size=(1, 7), stride=(1, 1), bias=False)
+        self.conv10 = nn.Conv2d(128, 128, kernel_size=(1, 5), stride=(1, 1), bias=False)
+        self.conv11 = nn.Conv2d(128, 128, kernel_size=(1, 3), stride=(1, 1), bias=False) # [batch, 128, 1, 360]
+
         self.relu = nn.ReLU(inplace=True)
 
         """
@@ -62,7 +65,7 @@ class OverlapTransformer(nn.Module):
         self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast2 = norm_layer(1024)
 
-        self.linear = nn.Linear(128*900, 256)
+        self.linear = nn.Linear(128*360, 256)
 
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax()
@@ -71,7 +74,7 @@ class OverlapTransformer(nn.Module):
             NETVLAD
             add_batch_norm=False is needed in our work.
         """
-        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=900, cluster_size=64,
+        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=360, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
 

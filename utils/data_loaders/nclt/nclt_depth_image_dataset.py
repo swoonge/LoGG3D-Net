@@ -7,7 +7,7 @@ import random
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from utils.o3d_tools import *
 from utils.data_loaders.pointcloud_dataset import *
-from config.train_config import *
+from config.config import *
 from utils.data_utils.utils import *
 
 class NCLTDepthImageDataset(PointCloudDataset):
@@ -164,9 +164,9 @@ class NCLTDepthImageTupleDataset(NCLTDepthImageDataset):
         negative_ids = self.get_negatives(drive_id, query_id)
 
         if len(positive_ids) < self.positives_per_query:
-            positive_ids = positive_ids + positive_ids
+            positive_ids = (positive_ids * (self.positives_per_query // len(positive_ids) + 1))[:self.positives_per_query]
         if len(negative_ids) < self.negatives_per_query:
-            negative_ids = negative_ids + negative_ids
+            negative_ids = (negative_ids * (self.negatives_per_query // len(negative_ids) + 1))[:self.negatives_per_query]
 
         selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
         selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)

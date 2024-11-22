@@ -19,7 +19,7 @@ from tqdm import tqdm
 import torch
 from utils.misc_utils import log_config
 from utils.data_loaders.make_dataloader import *
-from config.train_config import get_config
+from config.config import get_config
 from models.pipeline_factory import get_pipeline
 torch.backends.cudnn.benchmark = True # cuDNN의 성능을 최적화하기 위한 설정. 데이터 크기가 일정할 때 효율적
 

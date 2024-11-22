@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format="")
 
 import torch
 from utils.data_loaders.make_dataloader import *
-from config.train_config import get_config
+from config.config import get_config
 from models.pipeline_factory import get_pipeline
 from training import train_utils
 

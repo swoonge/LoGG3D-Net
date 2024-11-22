@@ -200,7 +200,7 @@ class OverlapTransformer_geo(nn.Module):
 
         return out_l
 
-from config.train_config import get_config
+from config.config import get_config
 if __name__ == '__main__':
     # load config ================================================================
     config = get_config()

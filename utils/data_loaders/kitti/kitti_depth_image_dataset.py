@@ -190,9 +190,9 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
         drive_id, query_id, positive_ids, negative_ids = self.files[idx]
 
         if len(positive_ids) < self.positives_per_query:
-            positive_ids = positive_ids + positive_ids
+            positive_ids = (positive_ids * (self.positives_per_query // len(positive_ids) + 1))[:self.positives_per_query]
         if len(negative_ids) < self.negatives_per_query:
-            negative_ids = negative_ids + negative_ids
+            negative_ids = (negative_ids * (self.negatives_per_query // len(negative_ids) + 1))[:self.negatives_per_query]
 
         selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
         selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
@@ -221,10 +221,7 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
                     other_neg_th,
                     meta_info)
 
-import logging
-import json
-from matplotlib import pyplot as plt
-from config.train_config import *
+from config.config import *
 
 # Config 객체 생성
 config = get_config()

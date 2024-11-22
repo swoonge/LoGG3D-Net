@@ -97,7 +97,7 @@ torchpack dist-run -np ${_NGPU} python training/train.py \
     --train_pipeline 'LOGG3D' \
     --dataset 'MulRanPointSparseTupleDataset'
 ```
-- See ```config/train_config.py``` for all other training parameters.
+- See ```config/config.py``` for all other training parameters.
 
 ### Evaluation
 For KITTI (eg. sequence 06):

@@ -116,7 +116,7 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
 
 
 if __name__ == "__main__":
-    from config.train_config import get_config
+    from config.config import get_config
     from utils.o3d_tools import *
 
     logger = logging.getLogger()
