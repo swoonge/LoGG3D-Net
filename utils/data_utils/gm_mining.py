@@ -226,6 +226,7 @@ class GM_processor:
 if __name__ == '__main__':
     args = parser.parse_args()
     base_dir = '/media/vision/SSD1/Datasets/gm_datasets'
+    # base_dir = '/data/datasets/gm_datasets'
 
     all_drive_ids = [str(i).zfill(2) for i in range(0, 4)]
     gen_ri_bev_drive_ids = [str(i).zfill(2) for i in range(0, 4)]

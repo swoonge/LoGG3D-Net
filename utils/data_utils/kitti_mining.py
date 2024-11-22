@@ -1,4 +1,4 @@
-import os, json, logging, time
+import os, json, logging, time, sys
 import numpy as np
 from tqdm import tqdm
 import open3d as o3d
@@ -225,6 +225,7 @@ class Kitti_processor:
 if __name__ == '__main__':
     args = parser.parse_args()
     base_dir = '/media/vision/SSD1/Datasets/kitti/dataset'
+    # base_dir = '/data/datasets/kitti/dataset'
 
     all_drive_ids = [str(i).zfill(2) for i in range(0, 11)]
     gen_ri_bev_drive_ids = [str(i).zfill(2) for i in range(0, 11)]
