@@ -13,19 +13,19 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'OverlapTransformer')
+pipeline_default = os.getenv('PIPELINE', 'OverlapNetTransformer')
                                         # LOGG3D
                                         # OverlapTransformer
                                         # OverlapTransformer_geo
                                         # CVTNet
-dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
+dataset_default = os.getenv('DATASET', 'GMDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
                                       # GMPointSparseTupleDataset
                                       # NCLTPointSparseTupleDataset
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OT_default_kitti00_quadruplet')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OLT_default_gm02')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -35,16 +35,16 @@ trainer_arg.add_argument('--resume_checkpoint', type=str, default='')
 # Batch setting
 trainer_arg.add_argument('--batch_size', type=int, default=1) # Batch size is limited to 1.
 trainer_arg.add_argument('--train_num_workers', type=int, default=8)  # per gpu in dist. try 8
-
+trainer_arg.add_argument('--server', type=bool, default=True)  # per gpu in dist. try 8
 
 ### Loss Function ###
 loss_arg = add_argument_group('Loss')
 # Contrastive
-loss_arg.add_argument('--train_loss_function', type=str, default='quadruplet') # quadruplet, triplet
+loss_arg.add_argument('--train_loss_function', type=str, default='triplet') # quadruplet, triplet
 loss_arg.add_argument('--lazy_loss', type=str2bool, default=True)
 loss_arg.add_argument('--ignore_zero_loss', type=str2bool, default=False)
-loss_arg.add_argument('--positives_per_query', type=int, default=2) # 2
-loss_arg.add_argument('--negatives_per_query', type=int, default=2) # 2-18
+loss_arg.add_argument('--positives_per_query', type=int, default=6) # 2
+loss_arg.add_argument('--negatives_per_query', type=int, default=6) # 2-18
 loss_arg.add_argument('--loss_margin_1', type=float, default=0.5) # 0.5
 loss_arg.add_argument('--loss_margin_2', type=float, default=0.3) # 0.3
 
@@ -82,10 +82,10 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default=
                         {   "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
                             "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default=
-                        {'train': [3, 4, 5, 6, 7, 8, 9, 10], 'val': [2], 'test': [0]})
+                        {'train': [0, 3, 4, 5, 6, 7, 9, 10], 'val': [2], 'test': [8]})
 
 # MulRan Dataset
-data_arg.add_argument('--mulran_dir', type=str, default='/media/vision/SSD1/Datasets/MulRan/', help="Path to the MulRan dataset")
+data_arg.add_argument('--mulran_dir', type=str, default='/media/vision/SSD1/Datasets/MulRan', help="Path to the MulRan dataset")
 data_arg.add_argument("--mulran_normalize_intensity", type=str2bool, default=False, help="Normalize intensity return.")
 data_arg.add_argument('--mulran_3m_json', type=str, default='positive_sequence_D-3_T-0.json')
 data_arg.add_argument('--mulran_20m_json', type=str, default='positive_sequence_D-20_T-0.json')
@@ -108,7 +108,7 @@ data_arg.add_argument("--gm_normalize_intensity", type=str2bool, default=False, 
 data_arg.add_argument('--gm_3m_json', type=str, default='positive_sequence_D-2_T-0.json')
 data_arg.add_argument('--gm_20m_json', type=str, default='positive_sequence_D-10_T-0.json')
 data_arg.add_argument('--gm_seq_lens', type=dict, default={"0": 4150, "1": 6283, "2": 5340,"3": 5410})
-data_arg.add_argument('--gm_data_split', type=dict, default={'train': [0, 1, 2], 'val': [3], 'test': [3]})
+data_arg.add_argument('--gm_data_split', type=dict, default={'train': [0, 1, 3], 'val': [2], 'test': [2]})
 
 # NCLT Dataset
 data_arg.add_argument('--nclt_dir', type=str, default='/media/vision/SSD1/Datasets/NCLT', help="Path to the gm dataset")

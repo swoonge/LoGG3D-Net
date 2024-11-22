@@ -16,11 +16,13 @@ class GMDepthImageDataset(PointCloudDataset):
                  random_scale=False,
                  config=None):
 
-        self.root  = config.gm_dir
+        self.root = config.gm_dir
 
-        if 'OverlapTransformer' in config.pipline:
+        if 'OverlapTransformer' in config.pipeline:
             self.image_folder = 'range_images'
-        elif 'CVT' in config.pipline:
+        elif 'OverlapNetTransformer' in config.pipeline:
+            self.image_folder = 'range_images'
+        elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
 
         PointCloudDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
