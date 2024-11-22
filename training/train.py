@@ -25,7 +25,7 @@ from training import train_utils
 if args.server:
     from config.train_config_server import get_config
 else:
-    from config.train_config import get_config
+    from config.config import get_config
 
 cfg = get_config()
 
@@ -43,7 +43,7 @@ def main():
 
     logger = logging.getLogger()
     logger.info('\n' + ' '.join([sys.executable] + sys.argv))
-    logger.info('Slurm Job ID: ' + cfg.job_id)
+    # logger.info('Slurm Job ID: ' + cfg.job_id)
     logger.info('Training pipeline: ' + cfg.pipeline)
     logger.info('Model Save Path: ' + model_save_path)
     logger.info('SummartWriter Path: ' + writer_save_path)
@@ -60,7 +60,7 @@ def main():
     optimizer = train_utils.get_optimizer(cfg, model.parameters())
     scheduler = train_utils.get_scheduler(cfg, optimizer)
 
-    if cfg.resume_training:
+    if cfg.resume_checkpoint:
         resume_filename = cfg.resume_checkpoint
         logger.info("Resuming Model From ", os.path.join(model_save_path, resume_filename))
         checkpoint = torch.load(os.path.join(model_save_path, resume_filename))
@@ -94,7 +94,7 @@ def main():
         running_loss = 0.0
         running_scene_loss = 0.0
         running_point_loss = 0.0
-        metric_epoch_loss = 0.0
+        train_loss = 0.0
         val_loss = 0.0
 
         model.train()
@@ -166,6 +166,7 @@ def main():
             optimizer.step()
 
             running_loss += loss.item()
+            train_loss += loss.item()
             if (i % cfg.loss_log_step) == (cfg.loss_log_step - 1):
                 avg_loss = running_loss / i
                 avg_scene_loss = running_scene_loss / i
@@ -176,8 +177,11 @@ def main():
                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
+                writer.add_scalar('running loss', avg_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
-                
+
+        train_loss = train_loss / len(train_loader)
+        writer.add_scalar('train loss', train_loss, epoch)
         if cfg.scheduler == 'ReduceLROnPlateau':
             scheduler.step(running_loss / len(train_loader))
         else:
@@ -240,36 +244,37 @@ def main():
                     ## loss
                     scene_loss = loss_function(output, cfg)
                     running_scene_loss += scene_loss.item()
-                    metric_epoch_loss += scene_loss.item()
                     loss = scene_loss
                         
                 val_loss += loss.item()
             val_loss = val_loss / len(val_loader)
 
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            save_path = str(model_save_path) + '/' + "epoch_best_" + str(epoch) + ".pth"
-        else:
-            save_path = str(model_save_path) + '/' + "epoch_" + str(epoch) + ".pth"
-        logger.info("Saving to: " + str(save_path))
-        if isinstance(model, torch.nn.DataParallel):
-            model_to_save = model.module
-        elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
-            model_to_save = model.module
-        else:
-            model_to_save = model
-        torch.save({
-            'config': cfg,
-            'epoch': epoch,
-            'model_state_dict': model_to_save.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss
-        }, save_path)
-        
-        lr = optimizer.param_groups[0]['lr']
-        logger.info('val loss: ' + str(val_loss)[:7])
-        writer.add_scalar('lr', lr, epoch)
-        writer.add_scalar('val loss', val_loss, epoch)
+            lr = optimizer.param_groups[0]['lr']
+            logger.info('val loss: ' + str(val_loss)[:7])
+            writer.add_scalar('lr', lr, epoch)
+            writer.add_scalar('val loss', val_loss, epoch)
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                save_path = str(model_save_path) + '/' + "epoch_best_" + str(epoch) + ".pth"
+            else:
+                save_path = str(model_save_path) + '/' + "epoch_" + str(epoch) + ".pth"
+            logger.info("Saving to: " + str(save_path))
+            if isinstance(model, torch.nn.DataParallel):
+                model_to_save = model.module
+            elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
+                model_to_save = model.module
+            else:
+                model_to_save = model
+            torch.save({
+                'config': cfg,
+                'epoch': epoch,
+                'model_state_dict': model_to_save.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss
+            }, save_path)
+            
+            
 
     logger.info("Finished training.")
 
