@@ -168,16 +168,16 @@ def main():
             running_loss += loss.item()
             train_loss += loss.item()
             if (i % cfg.loss_log_step) == (cfg.loss_log_step - 1):
-                avg_loss = running_loss / i
-                avg_scene_loss = running_scene_loss / i
-                avg_point_loss = running_point_loss / i
+                avg_running_loss = running_loss / cfg.loss_log_step
+                avg_scene_loss = running_scene_loss / cfg.loss_log_step
+                avg_point_loss = running_point_loss / cfg.loss_log_step
 
                 lr = optimizer.param_groups[0]['lr']
-                tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_loss)[:7] + ' LR: %03f' % (lr) + 
+                tqdm.write('[' + str(i) + '/' + str(len(train_loader)) +'] avg running loss: ' + str(avg_running_loss)[:7] + ' LR: %03f' % (lr) + 
                                 ' avg_scene_loss: ' + str(avg_scene_loss)[:7] + ' avg_point_loss: ' + str(avg_point_loss)[:7])
                 writer.add_scalar('training point loss', avg_point_loss, epoch * len(train_loader) + i)
                 writer.add_scalar('training scene loss', avg_scene_loss, epoch * len(train_loader) + i)
-                writer.add_scalar('running loss', avg_loss, epoch * len(train_loader) + i)
+                writer.add_scalar('running loss', avg_running_loss, epoch * len(train_loader) + i)
                 running_loss, running_scene_loss, running_point_loss = 0.0, 0.0, 0.0
 
         train_loss = train_loss / len(train_loader)
