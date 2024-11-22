@@ -25,7 +25,7 @@ dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OT_default_kitti08')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OT_default_kitti00_quadruplet')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -40,11 +40,11 @@ trainer_arg.add_argument('--train_num_workers', type=int, default=8)  # per gpu 
 ### Loss Function ###
 loss_arg = add_argument_group('Loss')
 # Contrastive
-loss_arg.add_argument('--train_loss_function', type=str, default='triplet') # quadruplet, triplet
+loss_arg.add_argument('--train_loss_function', type=str, default='quadruplet') # quadruplet, triplet
 loss_arg.add_argument('--lazy_loss', type=str2bool, default=True)
 loss_arg.add_argument('--ignore_zero_loss', type=str2bool, default=False)
-loss_arg.add_argument('--positives_per_query', type=int, default=6) # 2
-loss_arg.add_argument('--negatives_per_query', type=int, default=6) # 2-18
+loss_arg.add_argument('--positives_per_query', type=int, default=2) # 2
+loss_arg.add_argument('--negatives_per_query', type=int, default=2) # 2-18
 loss_arg.add_argument('--loss_margin_1', type=float, default=0.5) # 0.5
 loss_arg.add_argument('--loss_margin_2', type=float, default=0.3) # 0.3
 
@@ -82,7 +82,7 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default=
                         {   "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
                             "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default=
-                        {'train': [0, 3, 4, 5, 6, 7, 9, 10], 'val': [2], 'test': [8]})
+                        {'train': [3, 4, 5, 6, 7, 8, 9, 10], 'val': [2], 'test': [0]})
 
 # MulRan Dataset
 data_arg.add_argument('--mulran_dir', type=str, default='/media/vision/SSD1/Datasets/MulRan/', help="Path to the MulRan dataset")

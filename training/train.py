@@ -103,7 +103,6 @@ def main():
         train_loader_progress_bar = tqdm(train_loader, desc="Training", leave=True)
 
         for i, batch in enumerate(train_loader_progress_bar, 0):
-            
             if i >= len(train_loader):
                 break
             if cfg.pipeline == 'LOGG3D':

@@ -94,10 +94,10 @@ class OverlapTransformer(nn.Module):
         out_l = self.relu(self.conv7(out_l))
         out_l = self.relu(self.conv8(out_l))
         out_l = self.relu(self.conv9(out_l))
-        if self.x_high >= 32:
-            out_l = self.relu(self.conv10(out_l))
-        if self.x_high >= 64:
-            out_l = self.relu(self.conv11(out_l))
+        # if self.x_high >= 32:
+        out_l = self.relu(self.conv10(out_l))
+        # if self.x_high >= 64:
+        out_l = self.relu(self.conv11(out_l))
 
         out_l_1 = out_l.permute(0,1,3,2)
         out_l_1 = self.relu(self.convLast1(out_l_1))
