@@ -24,9 +24,11 @@ class NCLTDepthImageDataset(PointCloudDataset):
 
         self.root = root = config.nclt_dir
 
-        if 'OverlapTransformer' in config.pipline:
+        if 'OverlapTransformer' in config.pipeline:
             self.image_folder = 'range_images'
-        elif 'CVT' in config.pipline:
+        elif 'OverlapNetTransformer' in config.pipeline:
+            self.image_folder = 'range_images'
+        elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
 
         PointCloudDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
@@ -170,15 +172,15 @@ class NCLTDepthImageTupleDataset(NCLTDepthImageDataset):
 
         selected_positive_ids = random.sample(positive_ids, self.positives_per_query)
         selected_negative_ids = random.sample(negative_ids, self.negatives_per_query)
-        positives, negatives = [], []
+        positives, negatives, other_neg = [], [], None
 
         query_tensor = self.get_npy_file(drive_id, query_id)
         for pos_id in selected_positive_ids:
             positives.append(self.get_npy_file(drive_id, pos_id))
-            print("Positive:", pos_id, self.get_npy_file(drive_id, pos_id).shape)
+            # print("Positive:", pos_id, self.get_npy_file(drive_id, pos_id).shape)
         for neg_id in selected_negative_ids:
             negatives.append(self.get_npy_file(drive_id, neg_id))
-            print("Negative:", neg_id, self.get_npy_file(drive_id, neg_id).shape)
+            # print("Negative:", neg_id, self.get_npy_file(drive_id, neg_id).shape)
 
         meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
 

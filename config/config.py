@@ -13,19 +13,20 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'OverlapNetTransformer')
+pipeline_default = os.getenv('PIPELINE', 'OverlapTransformer')
                                         # LOGG3D
                                         # OverlapTransformer
+                                        # OverlapNetTransformer
                                         # OverlapTransformer_geo
                                         # CVTNet
-dataset_default = os.getenv('DATASET', 'GMDepthImageTupleDataset')
+dataset_default = os.getenv('DATASET', 'NCLTDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
                                       # GMPointSparseTupleDataset
                                       # NCLTPointSparseTupleDataset
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OLT_default_gm02')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OT_default_nclt')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -35,7 +36,7 @@ trainer_arg.add_argument('--resume_checkpoint', type=str, default='')
 # Batch setting
 trainer_arg.add_argument('--batch_size', type=int, default=1) # Batch size is limited to 1.
 trainer_arg.add_argument('--train_num_workers', type=int, default=8)  # per gpu in dist. try 8
-trainer_arg.add_argument('--server', type=bool, default=True)  # per gpu in dist. try 8
+trainer_arg.add_argument('--server', type=bool, default=False)  # per gpu in dist. try 8
 
 ### Loss Function ###
 loss_arg = add_argument_group('Loss')
@@ -120,8 +121,8 @@ data_arg.add_argument('--nclt_seq_lens', type=dict, default={
     })
 data_arg.add_argument('--nclt_data_split', type=dict, default={
     'train': ["2012-01-08"],
-    'val': ["2012-01-08"],
-    'test': ["2012-01-08"]
+    'val': ["2012-02-05"],
+    'test': ["2012-02-05"]
     })
 
 # Data loader configs
