@@ -15,6 +15,7 @@ import torch.nn as nn
 
 from aggregators.netvlad import NetVLADLoupe
 import torch.nn.functional as F
+from torch_geometric.nn import GATConv
 
 """
     Feature extracter of OverlapTransformer.
@@ -28,9 +29,9 @@ import torch.nn.functional as F
         norm_layer: None in our work for better model.
         use_transformer: Whether to use MHSA.
 """
-class OverlapTransformer(nn.Module):
+class OverlapGAT(nn.Module):
     def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer = True):
-        super(OverlapTransformer, self).__init__()
+        super(OverlapGAT, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
 
@@ -55,17 +56,12 @@ class OverlapTransformer(nn.Module):
             MHSA
             num_layers=1 is suggested in our work.
         """
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.)
-        self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast1 = norm_layer(256)
         self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast2 = norm_layer(1024)
 
         self.linear = nn.Linear(128*900, 256)
-
-        self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.Softmax()
 
         """
             NETVLAD
@@ -75,13 +71,18 @@ class OverlapTransformer(nn.Module):
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
 
-        """TODO: How about adding some dense layers?"""
-        self.linear1 = nn.Linear(1 * 256, 256)
-        self.bnl1 = norm_layer(256)
-        self.linear2 = nn.Linear(1 * 256, 256)
-        self.bnl2 = norm_layer(256)
-        self.linear3 = nn.Linear(1 * 256, 256)
-        self.bnl3 = norm_layer(256)
+        # Graph Attention Network
+        self.gat_conv = GATConv(256, 256, heads=4, concat=False, dropout=0.6)
+
+    def create_edges(self, num_nodes):
+        # 이 메서드는 인스턴스 메서드로 클래스 내에서 정의되어 있어야 함
+        edges = []
+        for i in range(num_nodes):
+            for j in range(-45, 45):  # Connect 90 nodes in total, 45 before and 45 after
+                neighbor = (i + j) % num_nodes  # Rotational handling for the ends
+                if neighbor != i:
+                    edges.append((i, neighbor))
+        return torch.tensor(edges, dtype=torch.long).t().contiguous()
 
     def forward(self, x_l):
 
@@ -102,24 +103,27 @@ class OverlapTransformer(nn.Module):
         out_l_1 = out_l.permute(0,1,3,2)
         out_l_1 = self.relu(self.convLast1(out_l_1))
 
-        """Using transformer needs to decide whether batch_size first"""
-        if self.use_transformer:
-            out_l = out_l_1.squeeze(3)
-            out_l = out_l.permute(0, 2, 1)
-            out_l = self.transformer_encoder(out_l)
-            out_l = out_l.permute(0, 2, 1)
-            out_l = out_l.unsqueeze(3)
-            out_l = torch.cat((out_l_1, out_l), dim=1)
-            out_l = self.relu(self.convLast2(out_l))
-            out_l = F.normalize(out_l, dim=1)
-            out_l = self.net_vlad(out_l)
-            out_l = F.normalize(out_l, dim=1)
+        # Prepare input for GAT
+        batch_size, feature_dim, num_queries, _ = out_l_1.size()
+        out_l = out_l_1.squeeze(3).permute(0, 2, 1)  # [batch, query, feature_dim]
+        
+        edge_index = self.create_edges(num_queries).to(out_l.device)
+        # edge_index = edge_index  # edge_index를 동일한 디바이스로 이동
+        out_list = []
 
-        else:
-            out_l = torch.cat((out_l_1, out_l_1), dim=1)
-            out_l = F.normalize(out_l, dim=1)
-            out_l = self.net_vlad(out_l)
-            out_l = F.normalize(out_l, dim=1)
+        for i in range(batch_size):
+            node_features = out_l[i]  # [num_queries, feature_dim]
+            gat_out = self.gat_conv(node_features, edge_index)
+            out_list.append(gat_out)
+
+        out_l = torch.stack(out_list, dim=0)  # [batch_size, num_queries, feature_dim]
+        out_l = out_l.permute(0, 2, 1).unsqueeze(3)  # [batch, feature_dim, query, H=1]
+
+        out_l = torch.cat((out_l_1, out_l), dim=1)
+        out_l = self.relu(self.convLast2(out_l))
+        out_l = F.normalize(out_l, dim=1)
+        out_l = self.net_vlad(out_l)
+        out_l = F.normalize(out_l, dim=1)
 
         return out_l
 

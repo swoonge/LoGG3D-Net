@@ -124,13 +124,6 @@ class NCLTPointSparseTupleDataset(NCLTSparseTupleDataset):
         NCLTSparseTupleDataset.__init__(self, phase, random_rotation, random_occlusion, random_scale, config)
 
         self.logger.info("KittiPointSparseTupleDataset")
-
-        self.poses_dict = {}
-        drive_ids = config.nclt_data_split[phase]
-        
-        for drive_id in drive_ids:
-            _, poses, _ = load_nclt_files_poses_timestamps(self.root, drive_id)  # 드라이브 ID에 해당하는 파일 리스트 로드
-            self.poses_dict[drive_id] = poses  # 쿼리 ID와 파일 매핑을 저장하는 딕셔너리 초기화
             
     def get_delta_pose(self, transforms):
         w_T_p1 = transforms[0]

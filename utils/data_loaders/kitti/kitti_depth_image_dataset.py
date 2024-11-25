@@ -18,9 +18,7 @@ class KittiDepthImageDataset(PointCloudDataset):
 
         self.root  = config.kitti_dir
 
-        if 'OverlapTransformer' in config.pipeline:
-            self.image_folder = 'range_images'
-        elif 'OverlapNetTransformer' in config.pipeline:
+        if 'Overlap' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
@@ -30,6 +28,8 @@ class KittiDepthImageDataset(PointCloudDataset):
         self.logger.info(f"Initializing Dataset with {self.image_folder} folder")
 
         self.id_file_dicts = {}
+        self.poses_dict = {}
+        self.timestamps_dict = {}
         self.files = []
 
         drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
@@ -40,6 +40,8 @@ class KittiDepthImageDataset(PointCloudDataset):
                 self.files.append((drive_id, query_id))
                 id_file_dict[query_id] = file.split('.')[0]+'.npy'
             self.id_file_dicts[drive_id] = id_file_dict
+            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
+            self.timestamps_dict[drive_id] = load_kitti_timestamps(self.root, drive_id)
 
     def get_npy_fn(self, drive, file):
         fname = os.path.join(self.root, 'sequences', drive, self.image_folder, file)
@@ -147,8 +149,7 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
         self.files = []
         drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
         for drive_id in drive_ids:
-            files = load_kitti_files(self.root, drive_id, is_sorted=True)
-            for query_id, file in enumerate(files):
+            for query_id in range(len(self.id_file_dicts[drive_id])):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)
                 self.files.append((drive_id, query_id, positives, negatives))

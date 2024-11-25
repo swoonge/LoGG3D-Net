@@ -27,6 +27,8 @@ class KittiDataset(PointCloudDataset):
             self.logger.info("Dataloader initialized with Ground Plane removal.")  # Ground Plane 제거 활성화 로그 출력
 
         self.id_file_dicts = {}  # 드라이브 ID와 파일 매핑을 저장하는 딕셔너리 초기화
+        self.poses_dict = {}
+        self.timestamps_dict = {}
         self.files = []
 
         drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]  # 드라이브 ID 리스트 생성
@@ -37,6 +39,8 @@ class KittiDataset(PointCloudDataset):
                 self.files.append((drive_id, query_id))  # 드라이브 ID와 쿼리 ID 튜플을 파일 리스트에 추가
                 id_file_dict[query_id] = file  # 쿼리 ID와 파일 매핑을 딕셔너리에 추가
             self.id_file_dicts[drive_id] = id_file_dict  # 드라이브 ID와 파일 매핑 딕셔너리를 전체 딕셔너리에 추가
+            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
+            self.timestamps_dict[drive_id] = load_kitti_timestamps(self.root, drive_id)
 
     def get_velodyne_fn(self, drive, file):
         '''
@@ -135,8 +139,7 @@ class KittiTupleDataset(KittiDataset):
         self.files = []
         drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
         for drive_id in drive_ids:
-            files = load_kitti_files(self.root, drive_id, is_sorted=True)
-            for query_id, file in enumerate(files):
+            for query_id in range(len(self.id_file_dicts[drive_id])):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)
                 self.files.append((drive_id, query_id, positives, negatives))

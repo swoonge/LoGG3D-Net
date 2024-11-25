@@ -131,12 +131,6 @@ class KittiPointSparseTupleDataset(KittiSparseTupleDataset):
 
         self.logger.info("KittiPointSparseTupleDataset")
 
-        self.poses_dict = {}
-
-        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]  # 드라이브 ID 리스트 생성
-        for drive_id in self.drive_ids:
-            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
-
     def get_delta_pose(self, transforms):
         w_T_p1 = transforms[0]
         w_T_p2 = transforms[1]

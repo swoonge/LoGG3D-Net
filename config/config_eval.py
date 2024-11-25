@@ -159,11 +159,11 @@ eval_arg.add_argument("--num_thresholds", default=1000, type=int, help="Number o
 
 
 ### Parse ###
-def get_config():
+def get_config_eval():
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
-    cfg = get_config()
+    cfg = get_config_eval()
     dconfig = vars(cfg)
     print(dconfig)

@@ -9,6 +9,8 @@ from pipelines.overlap_transformer_resnet import *
 from pipelines.overlap_transformer_ViT import *
 from pipelines.overlap_transformer_geo import *
 from pipelines.cvtnet import CVTNet
+from pipelines.overlap_gat import OverlapGAT
+from pipelines.overlap_vit import OverlapViT
 
 
 def get_pipeline(cfg):
@@ -23,14 +25,14 @@ def get_pipeline(cfg):
             pipeline = OverlapNetTransformer(channels=1, height=64, use_transformer=True)
         elif "GM" in cfg.dataset:
             pipeline = OverlapNetTransformer(channels=1, height=32, use_transformer=True)
-    elif cfg.pipeline == 'OverlapTransformer_resnet':
-        pipeline = OverlapTransformer_resnet(channels=1, use_transformer=True, mode=cfg.OverlapTransformer_resnet_mode)
-    elif cfg.pipeline == 'OverlapTransformer_ViT':
-        pipeline = OverlapTransformerViT_torch(channels=1, patch_size=16, num_layers=1)
     elif cfg.pipeline == 'OverlapTransformer_geo':
         pipeline = OverlapTransformer_geo(channels=1, use_transformer=True)
     elif cfg.pipeline == 'CVTNet':
         pipeline = CVTNet(channels=5, use_transformer=True)
+    elif cfg.pipeline == 'OverlapGAT':
+        pipeline = OverlapGAT(channels=1, use_transformer=True)
+    elif cfg.pipeline == 'OverlapViT':
+        pipeline = OverlapViT(channels=1)
     return pipeline
 
 # if __name__ == '__main__':

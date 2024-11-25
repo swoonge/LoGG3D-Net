@@ -38,18 +38,20 @@ class NCLTDataset(PointCloudDataset):
             self.logger.info("Dataloader initialized with Ground Plane removal.")  # Ground Plane 제거 활성화 로그 출력
 
         self.id_file_dicts = {}
-        self.id_timestamps_dict = {}
+        self.timestamps_dict = {}
+        self.poses_dict = {}
         self.files = []
 
         drive_ids = config.nclt_data_split[phase]  # 드라이브 ID 리스트 생성
         for drive_id in drive_ids:
-            files, _, timestamps = load_nclt_files_poses_timestamps(self.root, drive_id)  # 드라이브 ID에 해당하는 파일 리스트 로드
+            files, poses, timestamps = load_nclt_files_poses_timestamps(self.root, drive_id)  # 드라이브 ID에 해당하는 파일 리스트 로드
             id_file_dict = {}  # 쿼리 ID와 파일 매핑을 저장하는 딕셔너리 초기화
             for query_id, file in enumerate(files):
                 self.files.append((drive_id, query_id))  # 드라이브 ID와 쿼리 ID 튜플을 파일 리스트에 추가
                 id_file_dict[query_id] = file  # 쿼리 ID와 파일 매핑을 딕셔너리에 추가
             self.id_file_dicts[drive_id] = id_file_dict  # 드라이브 ID와 파일 매핑 딕셔너리를 전체 딕셔너리에 추가
-            self.id_timestamps_dict[drive_id] = timestamps
+            self.timestamps_dict[drive_id] = timestamps
+            self.poses_dict[drive_id] = poses
 
     def get_velodyne_fn(self, drive_id, fname):
         return os.path.join(self.root, 'velodyne_data', f'{drive_id}', 'velodyne_sync', fname)

@@ -24,9 +24,7 @@ class NCLTDepthImageDataset(PointCloudDataset):
 
         self.root = root = config.nclt_dir
 
-        if 'OverlapTransformer' in config.pipeline:
-            self.image_folder = 'range_images'
-        elif 'OverlapNetTransformer' in config.pipeline:
+        if 'OverlapNet' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
@@ -36,18 +34,20 @@ class NCLTDepthImageDataset(PointCloudDataset):
         self.logger.info(f"Initializing Dataset with {self.image_folder} folder")
 
         self.id_file_dicts = {}
-        self.id_timestamps_dict = {}
+        self.timestamps_dict = {}
+        self.poses_dict = {}
         self.files = []
 
         drive_ids = config.nclt_data_split[phase]
         for drive_id in drive_ids:
-            files, _, timestamps = load_nclt_files_poses_timestamps(root, drive_id)
+            files, poses, timestamps = load_nclt_files_poses_timestamps(root, drive_id)
             id_file_dict = {} 
             for query_id, file in enumerate(files):
                 self.files.append((drive_id, query_id))
                 id_file_dict[query_id] = file.split('.')[0]+'.npy'
             self.id_file_dicts[drive_id] = id_file_dict
-            self.id_timestamps_dict[drive_id] = timestamps
+            self.timestamps_dict[drive_id] = timestamps
+            self.poses_dict[drive_id] = poses
     
     def get_npy_fn(self, drive_id, file):
         return os.path.join(self.root, 'velodyne_data', f'{drive_id}', self.image_folder, file)

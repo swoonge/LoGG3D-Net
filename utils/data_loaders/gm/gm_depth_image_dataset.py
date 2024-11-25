@@ -18,9 +18,7 @@ class GMDepthImageDataset(PointCloudDataset):
 
         self.root = config.gm_dir
 
-        if 'OverlapTransformer' in config.pipeline:
-            self.image_folder = 'range_images'
-        elif 'OverlapNetTransformer' in config.pipeline:
+        if 'Overlap' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'

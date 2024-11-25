@@ -7,16 +7,14 @@ p = os.path.dirname(os.path.dirname((os.path.abspath(__file__))))
 if p not in sys.path:
     sys.path.append(p)
 import numpy as np
-from .utils import load_poses
 from scipy.spatial.distance import pdist, squareform
-from utils.data_loaders.kitti.kitti_rangeimage_dataset import load_timestamps
 from utils.data_loaders.make_dataloader import *
 from tools.utils.utils import *
 from models.pipelines.pipeline_utils import *
 from models.pipeline_factory import get_pipeline
 from tqdm import tqdm
 import pandas as pd
-from config.eval_config import *
+from config.config_eval import *
 
 torch.backends.cudnn.benchmark = True
 
@@ -74,25 +72,24 @@ def calculate_pose_distances_with_pdist(poses):
 
 # @torch.no_grad()
 class Evaluator:
-    def __init__(self, checkpoint_path, thresholds_linspace = [0.0, 1.0, 1000]) -> None:
+    def __init__(self, checkpoint_path) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.checkpoint_path = checkpoint_path
         self.checkpoint = torch.load(checkpoint_path)
         try:
             self.args = self.checkpoint['config']
-        except:
+        except Exception as e:
             self.args = get_config_eval()
-        if not hasattr(self.args, 'skip_time'):
-            self.args.skip_time = 30  # Default value for skip_time
 
-        self.args.kitti_dir = '/media/vision/SSD1/Datasets/kitti/dataset/'
-        self.args.gm_dir = '/media/vision/SSD1/Datasets/gm_datasets/'
+        self.args.kitti_dir = '/media/vision/SSD1/Datasets/kitti/dataset'
+        self.args.gm_dir = '/media/vision/SSD1/Datasets/gm_datasets'
+        self.args.mulran_dir = '/media/vision/SSD1/Datasets/MulRan'
+        self.args.nclt_dir = '/media/vision/SSD1/Datasets/NCLT'
 
         self.model = get_pipeline(self.args).to(self.device)
         try:
             self.model.load_state_dict(self.checkpoint['model_state_dict'])
         except Exception as e:
-            print("[error] ",e)
             self.model.load_state_dict(self.checkpoint['state_dict'])
         
         self.model.eval()
@@ -104,20 +101,27 @@ class Evaluator:
             # self.args.kitti_data_split['test'] = [int(checkpoint_path.split('.')[-2][-1])] # for Logg3D pretrained
             self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
             self.dataset_path = os.path.join(self.args.kitti_dir, 'sequences', self.sequence)
-            if self.args.dataset == 'KittiRangeImageTupleDataset': self.args.dataset = 'KittiRangeImageDataset' 
-            if self.args.dataset == 'KittiCVTTupleDataset': self.args.dataset = 'KittiCVTDataset' 
+            if "Overlap" in self.args.pipeline:
+                self.args.dataset = 'KittiDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'KittiSparseTupleDataset'
         elif 'GM' in self.args.dataset:
             self.pose_threshold = [1.5, 10.0]
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
             self.dataset_path = os.path.join(self.args.gm_dir, self.sequence)
+            if "Overlap" in self.args.pipeline:
+                self.args.dataset = 'GMDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'GMSparseTupleDataset'
         elif 'NCLT' in self.args.dataset:
             self.pose_threshold = [3.0, 20.0]
-            self.sequence = f"{'2012-02-05'}"
-            self.args.nclt_data_split['test'] = ['2012-02-05']
-            self.dataset_path = '/media/vision/SSD1/Datasets/NCLT'
-            self.args.dataset = 'NCLTRiBevDataset'
+            self.sequence = self.args.nclt_data_split['test']
+            if "Overlap" in self.args.pipeline:
+                self.args.dataset = 'NCLTDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'NCLTSparseTupleDataset'
         
-        self.thresholds = np.linspace(thresholds_linspace[0], thresholds_linspace[1], thresholds_linspace[2])#[300:600]
+        self.thresholds = np.linspace(self.args.cd_thresh_min, self.args.cd_thresh_max, self.args.num_thresholds)#[300:600]
         self.thresholds_num = len(self.thresholds)
         self.descriptors = []
 
@@ -138,28 +142,26 @@ class Evaluator:
         print('*' * 50)
         print('* evaluator run ...')
         # print("* processing for gt matching ...")
-        if 'NCLT' in self.args.dataset:
-            timestamps = self.data_loader.dataset.timestamps
-            poses = self.data_loader.dataset.poses
-        else:
-            timestamps = np.array(load_timestamps(self.dataset_path + '/times.txt'))
-            poses = load_poses(os.path.join(self.dataset_path, 'poses.txt'))
+        timestamps = self.data_loader.dataset.timestamps_dict[self.sequence]
+        poses = self.data_loader.dataset.poses_dict[self.sequence]
         
         # translations = np.array([pose[:3, 3] for pose in poses])
         # plot_translations(poses)
 
         pose_distances_matrix = calculate_pose_distances_with_pdist(poses)
         try:
-            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] +"_"+ str(self.data_loader.dataset.sequences[0]) + "_64.npz"
+            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] +"_"+ str(self.data_loader.dataset.sequences[0]) + "_64"
         except:
-            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64.npz"
+            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64"
 
-        if os.path.exists(descriptors_file_path):
+        if os.path.exists(descriptors_file_path+'.npy'):
             print(f"* Load preprocessed descriptors from {descriptors_file_path}")
             descriptors = np.load(descriptors_file_path)["descriptors"]
         else: 
             descriptors = self._make_descriptors()
-            np.savez_compressed(descriptors_file_path, descriptors=descriptors)
+            if not os.path.exists("preprocessed_descriptors"):
+                os.makedirs("preprocessed_descriptors")
+            np.save(descriptors_file_path, descriptors=descriptors)
 
 
         descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean'))
@@ -185,9 +187,9 @@ class Evaluator:
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
-            elif 'OverlapTransformer' in self.args.pipeline.split('_')[0]:
+            elif 'Overlap' in self.args.pipeline.split('_')[0]:
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
-                if batch[0][0].shape[0] > 1:
+                if input_t.ndim == 3:
                     input_t = input_t.unsqueeze(0)[:, 0, :, :].unsqueeze(1)
                 else:
                     input_t = input_t.unsqueeze(0).unsqueeze(0)

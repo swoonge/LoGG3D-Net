@@ -105,6 +105,7 @@ def main():
         for i, batch in enumerate(train_loader_progress_bar, 0):
             if i >= len(train_loader):
                 break
+            
             if cfg.pipeline == 'LOGG3D':
                 batch_st = batch[0].to(device)
                 # print("Features dtype:", batch_st.F.dtype)  # Features의 dtype
@@ -129,8 +130,8 @@ def main():
                 scene_loss = loss_function(output, cfg)
                 running_scene_loss += scene_loss.item()
                 loss = scene_loss
-
-            elif cfg.pipeline.split('_')[0] == 'OverlapTransformer' or cfg.pipeline.split('_')[0] == 'OverlapNetTransformer':
+            
+            elif 'Overlap' in cfg.pipeline.split('_')[0]:
                 if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
@@ -216,7 +217,7 @@ def main():
                     running_scene_loss += scene_loss.item()
                     loss = scene_loss
 
-                elif cfg.pipeline.split('_')[0] == 'OverlapTransformer' or cfg.pipeline.split('_')[0] == 'OverlapNetTransformer':
+                elif 'Overlap' in cfg.pipeline.split('_')[0]:
                     if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue
