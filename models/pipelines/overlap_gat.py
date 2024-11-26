@@ -78,7 +78,7 @@ class OverlapGAT(nn.Module):
         # 이 메서드는 인스턴스 메서드로 클래스 내에서 정의되어 있어야 함
         edges = []
         for i in range(num_nodes):
-            for j in range(-45, 45):  # Connect 90 nodes in total, 45 before and 45 after
+            for j in range(-15, 15):  # Connect 90 nodes in total, 45 before and 45 after
                 neighbor = (i + j) % num_nodes  # Rotational handling for the ends
                 if neighbor != i:
                     edges.append((i, neighbor))
