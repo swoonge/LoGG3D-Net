@@ -23,7 +23,7 @@ def get_pipeline(cfg):
     elif cfg.pipeline == 'OverlapNetTransformer':
         if "Kitti" in cfg.dataset:
             pipeline = OverlapNetTransformer(channels=1, height=64, use_transformer=True)
-        elif "GM" in cfg.dataset:
+        elif "GM" in cfg.dataset or "NCLT" in cfg.dataset:
             pipeline = OverlapNetTransformer(channels=1, height=32, use_transformer=True)
     elif cfg.pipeline == 'OverlapTransformer_geo':
         pipeline = OverlapTransformer_geo(channels=1, use_transformer=True)
