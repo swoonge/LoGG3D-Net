@@ -111,22 +111,19 @@ class KittiDepthImageDataset(PointCloudDataset):
 
         return depth_image
     
-    
+
     def random_rotate_images(self, depth_images):
         angle = random.randint(0, self.rotation_range)
-        print(f"Rotate {angle} degrees")
 
         if self.image_folder == 'range_images':
             _, width = depth_images.shape
             shift_pixels = int((angle / 360) * width)
-            print(f"Shift pixels: {shift_pixels}")
             return np.roll(depth_images, shift_pixels, axis=-1)
 
         elif self.image_folder == 'ri_bev':
             # 배치 전체에 대해 동일한 회전 각도 랜덤 선택
             _, _, width = depth_images.shape
             shift_pixels = int((angle / 360) * width)
-            print(f"Shift pixels: {shift_pixels}")
         
             return np.array([np.roll(depth_image, shift_pixels, axis=-1) for depth_image in depth_images])
     
