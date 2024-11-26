@@ -55,6 +55,24 @@ class NCLTDepthImageDataset(PointCloudDataset):
     def get_npy_file(self, drive_id, pc_id):
         return np.load(self.get_npy_fn(drive_id, self.id_file_dicts[drive_id][pc_id]))
     
+    def random_rotate_images(self, depth_images):
+        angle = random.randint(0, self.rotation_range)
+        print(f"Rotate {angle} degrees")
+
+        if self.image_folder == 'range_images':
+            _, width = depth_images.shape
+            shift_pixels = int((angle / 360) * width)
+            print(f"Shift pixels: {shift_pixels}")
+            return np.roll(depth_images, shift_pixels, axis=-1)
+
+        elif self.image_folder == 'ri_bev':
+            # 배치 전체에 대해 동일한 회전 각도 랜덤 선택
+            _, _, width = depth_images.shape
+            shift_pixels = int((angle / 360) * width)
+            print(f"Shift pixels: {shift_pixels}")
+        
+            return np.array([np.roll(depth_image, shift_pixels, axis=-1) for depth_image in depth_images])
+    
     def __getitem__(self, idx):
         drive_id, query_id  = self.files[idx]
 
@@ -181,15 +199,24 @@ class NCLTDepthImageTupleDataset(NCLTDepthImageDataset):
         for neg_id in selected_negative_ids:
             negatives.append(self.get_npy_file(drive_id, neg_id))
             # print("Negative:", neg_id, self.get_npy_file(drive_id, neg_id).shape)
+        
+        if self.random_rotation:
+            query = self.random_rotate_images(query)
+            for i in range(len(positives)):
+                positives[i] = self.random_rotate_images(positives[i])
+            for i in range(len(negatives)):
+                negatives[i] = self.random_rotate_images(negatives[i])
 
         meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
 
         if not self.quadruplet:
-            return query_tensor, positives, negatives, meta_info
+            return (query_tensor, positives, negatives, meta_info)
         else:  # For Quadruplet Loss
             other_negative_id = self.get_other_negative(drive_id, query_id, selected_positive_ids, selected_negative_ids)
             other_negative_tensor = self.get_npy_file(drive_id, other_negative_id)
-            return query_tensor, positives, negatives, other_negative_tensor, meta_info
+            if self.random_rotation:
+                other_negative_tensor = self.random_rotate_images(other_negative_tensor)
+            return (query_tensor, positives, negatives, other_negative_tensor, meta_info)
 
 # Config 객체 생성
 config = get_config()

@@ -18,6 +18,7 @@ class KittiDepthImageDataset(PointCloudDataset):
 
         self.root  = config.kitti_dir
 
+        print(config.pipeline)
         if 'Overlap' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
@@ -109,6 +110,26 @@ class KittiDepthImageDataset(PointCloudDataset):
                 lower_row += 1
 
         return depth_image
+    
+    
+    def random_rotate_images(self, depth_images):
+        angle = random.randint(0, self.rotation_range)
+        print(f"Rotate {angle} degrees")
+
+        if self.image_folder == 'range_images':
+            _, width = depth_images.shape
+            shift_pixels = int((angle / 360) * width)
+            print(f"Shift pixels: {shift_pixels}")
+            return np.roll(depth_images, shift_pixels, axis=-1)
+
+        elif self.image_folder == 'ri_bev':
+            # 배치 전체에 대해 동일한 회전 각도 랜덤 선택
+            _, _, width = depth_images.shape
+            shift_pixels = int((angle / 360) * width)
+            print(f"Shift pixels: {shift_pixels}")
+        
+            return np.array([np.roll(depth_image, shift_pixels, axis=-1) for depth_image in depth_images])
+    
 
     def __getitem__(self, idx):
         drive_id, query_id  = self.files[idx]
@@ -207,6 +228,13 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
         for neg_id in selected_negative_ids:
             negatives.append(self.get_npy_file(drive_id, neg_id))
 
+        if self.random_rotation:
+            query = self.random_rotate_images(query)
+            for i in range(len(positives)):
+                positives[i] = self.random_rotate_images(positives[i])
+            for i in range(len(negatives)):
+                negatives[i] = self.random_rotate_images(negatives[i])
+
         meta_info = {'drive': drive_id, 'query_id': query_id, 'positive_ids': selected_positive_ids, 'negative_ids': selected_negative_ids}
 
         if not self.quadruplet:
@@ -218,6 +246,8 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
             other_neg_id = self.get_other_negative(
                 drive_id, query_id, selected_positive_ids, selected_negative_ids)
             other_neg_th = self.get_npy_file(drive_id, other_neg_id)
+            if self.random_rotation:
+                other_neg_th = self.random_rotate_images(other_neg_th)
             return (query,
                     positives,
                     negatives,
@@ -228,11 +258,12 @@ from config.config import *
 
 # Config 객체 생성
 config = get_config()
+config.train_loss_function = 'quadruplet'
 
 # 데이터셋 테스트
 def test_nclt_datasets():
     # # NCLTDataset 테스트
-    config.pipline = 'OverlapTransformer'
+    config.pipeline = 'OverlapTransformer'
     kitti_dataset = KittiDepthImageDataset(phase='test', config=config)
     print("KittiRiDataset_ri 테스트 - 첫 번째 샘플:")
     query_tensor, meta_info = kitti_dataset[0]
@@ -240,7 +271,7 @@ def test_nclt_datasets():
     print("Metadata:", meta_info)
     del kitti_dataset
 
-    config.pipline = 'CVTNet'
+    config.pipeline = 'CVTNet'
     kitti_dataset = KittiDepthImageDataset(phase='test', config=config)
     print("KittiRiDataset_ri 테스트 - 첫 번째 샘플:")
     query_tensor, meta_info = kitti_dataset[0]
@@ -248,26 +279,56 @@ def test_nclt_datasets():
     print("Metadata:", meta_info)
     del kitti_dataset
 
-    config.pipline = 'OverlapTransformer'
-    kitti_tuple_dataset = KittiDepthImageTupleDataset(phase='train', config=config)
-    print("KittiRiTupleDataset_ri 테스트 - 두 번째 샘플:")
+    config.pipeline = 'OverlapTransformer'
+    kitti_tuple_dataset = KittiDepthImageTupleDataset(phase='train', config=config, random_rotation=True)
+    print("KittiRiTupleDataset_ri 테스트 - 첫 번째 샘플:")
     query_tensor, positives, negatives, other_negative, meta_info = kitti_tuple_dataset[0]
     print("Query tensor:", query_tensor.shape)
     print("Positives:", len(positives), positives[0].shape)
     print("Negatives:", len(negatives), negatives[0].shape)
     print("Negatives:", other_negative.shape)
     print("Metadata:", meta_info)
+
+    # 시각화
+    import matplotlib.pyplot as plt
+    # plt.figure(figsize=(12, 6))
+    # plt.subplot(3, 1, 1)
+    # plt.imshow(query_tensor, cmap='gray')
+    # plt.title("Query")
+    # plt.subplot(3, 1, 2)
+    # plt.imshow(positives[0], cmap='gray')
+    # plt.title("Positive1")
+    # plt.subplot(3, 1, 3)
+    # plt.imshow(positives[1], cmap='gray')
+    # plt.title("Positive2")
+    # plt.show()
+
     del kitti_tuple_dataset
 
-    config.pipline = 'CVTNet'
-    kitti_tuple_dataset = KittiDepthImageTupleDataset(phase='train', config=config)
-    print("\KittiTupleDataset 테스트 - 두 번째 샘플:")
+    config.pipeline = 'CVTNet'
+    kitti_tuple_dataset = KittiDepthImageTupleDataset(phase='train', config=config, random_rotation=True)
+    print("KittiTupleDataset 테스트 - 두 번째 샘플:")
     query_tensor, positives, negatives, other_negative, meta_info = kitti_tuple_dataset[0]
     print("Query tensor:", query_tensor.shape)
     print("Positives:", len(positives), positives[0].shape)
     print("Negatives:", len(negatives), negatives[0].shape)
     print("Negatives:", other_negative.shape)
     print("Metadata:", meta_info)
+
+    # 시각화
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(12, 6))
+    plt.subplot(3, 1, 1)
+    plt.imshow(query_tensor[0], cmap='gray')
+    plt.title("Query")
+    plt.subplot(3, 1, 2)
+    plt.imshow(positives[0][0], cmap='gray')
+    plt.title("Positive1_0")
+    plt.subplot(3, 1, 3)
+    plt.imshow(positives[0][1], cmap='gray')
+    plt.title("Positive1_1")
+    plt.show()
+    
     del kitti_tuple_dataset
 
 # 이 파일을 직접 실행했을 때만 테스트 함수 실행
