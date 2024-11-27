@@ -209,7 +209,7 @@ class OverlapGATv2(nn.Module):
         out_l = torch.stack(out_list, dim=0) # [batch, num_queries, feature_dim(512)]
         out_l = out_l.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim(512), num_queries, 1]
 
-        # out_l = torch.cat((out_l_1, out_l), dim=1)
+        # out_l = torch.cat((out_l_1, out_l), dim=1) # 기존의 residual을 없애고, GATv2Conv 자체의 학습 가능한 residual 옵션을 활용
         out_l = self.relu(self.convLast2(out_l)) # [batch, 1024, num_queries, 1]
         out_l = F.normalize(out_l, dim=1)
         out_l = self.net_vlad(out_l)

@@ -13,6 +13,7 @@ logging.basicConfig(format='%(asctime)s %(message)s',
 logging.basicConfig(level=logging.INFO, format="")
 
 from tools.utils.utils import Timer_for_torch as Timer
+from models.pipelines.pipeline_utils import *
 
 from tqdm import tqdm
 
@@ -40,14 +41,19 @@ def main():
     model = get_pipeline(cfg).to(device)
     model.eval()
     n_params = sum([param.nelement() for param in model.parameters()])
+
+    if 'LOGG3D' in cfg.pipeline:
+        cfg.dataset = 'KittiDataset'
+    if "Overlap" in cfg.pipeline:
+        cfg.dataset = 'KittiDepthImageDataset'
     
     loader = make_data_loader(cfg,
-                                cfg.val_phase,
+                                cfg.test_phase,
                                 cfg.batch_size,
                                 num_workers=cfg.train_num_workers,
                                 shuffle=False,
                                 )
-    loader_progress_bar = tqdm(loader, desc=f'[testing with kitti] 0' + str(cfg.kitti_data_split['val'][0]) + ' seq')
+    loader_progress_bar = tqdm(loader, desc=f'[testing with kitti ' + str(cfg.kitti_data_split['val'][0]).zfill(2) + '] seq')
      
     processing_timer = Timer()
 
@@ -56,16 +62,17 @@ def main():
             if i >= len(loader):
                 break
 
-            data = batch[0].to(device)
-            data = data.unsqueeze(0).unsqueeze(0)
-
             if cfg.pipeline == 'LOGG3D':
-                processing_timer.tic()
-                output = model(data[0])
-            elif cfg.pipeline == 'PointNetVLAD':
+                data = make_sparse_tensor(batch[0][0], cfg.voxel_size).to(device)
                 processing_timer.tic()
                 output = model(data)
-            elif cfg.pipeline.split('_')[0] == 'OverlapTransformer':
+            elif cfg.pipeline == 'PointNetVLAD':
+                data = batch[0].to(device)
+                processing_timer.tic()
+                output = model(data)
+            elif "Overlap" in cfg.pipeline:
+                data = torch.tensor(batch[0][0]).to(device)
+                data = data.unsqueeze(0).unsqueeze(0)
                 processing_timer.tic()
                 output = model(data)
             processing_timer.toc()

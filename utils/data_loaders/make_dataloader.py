@@ -91,7 +91,6 @@ def make_data_loader(config, phase, batch_size, num_workers=0, shuffle=None, dis
         try:
             Dataset = dataset_str_mapping[config.eval_dataset]
         except:
-            print(config.dataset)
             Dataset = dataset_str_mapping[config.dataset]
 
     dset = Dataset(phase,

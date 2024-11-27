@@ -45,7 +45,7 @@ class OverlapNetTransformer(nn.Module):
         self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 15), stride=(2, 1), bias=False)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=(3, 15), stride=(2, 1), bias=False)
         if self.x_high >= 64:
-            self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 15), stride=(2, 1), bias=False)
+            self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 12), stride=(2, 1), bias=False)
         self.conv5 = nn.Conv2d(64, 128, kernel_size=(2, 9), stride=(2, 1), bias=False)
         self.conv6 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
         self.conv7 = nn.Conv2d(128, 128, kernel_size=(1, 9), stride=(1, 1), bias=False)
@@ -102,7 +102,7 @@ class OverlapNetTransformer(nn.Module):
         out_l = self.relu(self.conv9(out_l))
         out_l = self.relu(self.conv10(out_l))
         out_l = self.relu(self.conv11(out_l)) # [13, 128, 1, 371] if 32, [13, 128, 1, 360] if 64
-
+        
         out_l_1 = out_l.permute(0,1,3,2)
         out_l_1 = self.relu(self.convLast1(out_l_1))
 
