@@ -24,7 +24,7 @@ class NCLTDepthImageDataset(PointCloudDataset):
 
         self.root = root = config.nclt_dir
 
-        if 'OverlapNet' in config.pipeline:
+        if 'Overlap' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
@@ -38,8 +38,8 @@ class NCLTDepthImageDataset(PointCloudDataset):
         self.poses_dict = {}
         self.files = []
 
-        drive_ids = config.nclt_data_split[phase]
-        for drive_id in drive_ids:
+        self.drive_ids = config.nclt_data_split[phase]
+        for drive_id in self.drive_ids:
             files, poses, timestamps = load_nclt_files_poses_timestamps(root, drive_id)
             id_file_dict = {} 
             for query_id, file in enumerate(files):

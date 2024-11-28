@@ -29,8 +29,8 @@ class GMDataset(PointCloudDataset):
         self.id_file_dicts = {}
         self.files = []
 
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True) # kitti와 파일 구성이 동일
             id_file_dict = {}
             for query_id, file in enumerate(files):
@@ -105,8 +105,8 @@ class GMTupleDataset(GMDataset):
         self.gm_seq_lens = config.gm_seq_lens
 
         self.files = []
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True)
             for query_id, file in enumerate(files):
                 positives = self.get_positives(drive_id, query_id)

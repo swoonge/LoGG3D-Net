@@ -72,8 +72,10 @@ def calculate_pose_distances_with_pdist(poses):
 
 # @torch.no_grad()
 class Evaluator:
-    def __init__(self, checkpoint_path) -> None:
+    def __init__(self, checkpoint_path, test_dataset_forced=None, test_for_val_set=False) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.test_dataset_forced = test_dataset_forced
+        self.test_for_val_set = test_for_val_set
         self.checkpoint_path = checkpoint_path
         self.checkpoint = torch.load(checkpoint_path)
         try:
@@ -94,28 +96,35 @@ class Evaluator:
         
         self.model.eval()
 
+        if self.test_dataset_forced is not None:
+            self.args.dataset = self.test_dataset_forced
+
         if 'Kitti' in self.args.dataset :
             self.pose_threshold = [3.0, 20.0]
+            if self.test_for_val_set:
+                self.args.kitti_data_split['test'] = self.args.kitti_data_split['val']
             self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
             # self.sequence = f"{int(checkpoint_path.split('.')[-2][-1]):02d}" # for Logg3D pretrained
             # self.args.kitti_data_split['test'] = [int(checkpoint_path.split('.')[-2][-1])] # for Logg3D pretrained
             self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
-            self.dataset_path = os.path.join(self.args.kitti_dir, 'sequences', self.sequence)
             if "Overlap" in self.args.pipeline:
                 self.args.dataset = 'KittiDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'KittiSparseTupleDataset'
         elif 'GM' in self.args.dataset:
             self.pose_threshold = [1.5, 10.0]
+            if self.test_for_val_set:
+                self.args.gm_data_split['test'] = self.args.gm_data_split['val']
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
-            self.dataset_path = os.path.join(self.args.gm_dir, self.sequence)
             if "Overlap" in self.args.pipeline:
                 self.args.dataset = 'GMDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'GMSparseTupleDataset'
         elif 'NCLT' in self.args.dataset:
             self.pose_threshold = [3.0, 20.0]
-            self.sequence = self.args.nclt_data_split['test']
+            if self.test_for_val_set:
+                self.args.nclt_data_split['test'] = self.args.nclt_data_split['val']
+            self.sequence = self.args.nclt_data_split['test'][0]
             if "Overlap" in self.args.pipeline:
                 self.args.dataset = 'NCLTDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
@@ -149,19 +158,19 @@ class Evaluator:
         # plot_translations(poses)
 
         pose_distances_matrix = calculate_pose_distances_with_pdist(poses)
-        try:
-            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] +"_"+ str(self.data_loader.dataset.sequences[0]) + "_64"
-        except:
-            descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64"
+        # try:
+        descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] +"_"+ str(self.data_loader.dataset.drive_ids[0])
+        # except:
+        #     descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64"
 
-        if os.path.exists(descriptors_file_path+'.npy'):
+        if os.path.exists(descriptors_file_path+'.npy') and self.test_dataset_forced is None:
             print(f"* Load preprocessed descriptors from {descriptors_file_path}")
-            descriptors = np.load(descriptors_file_path)["descriptors"]
+            descriptors = np.load(descriptors_file_path + '.npy')
         else: 
             descriptors = self._make_descriptors()
             if not os.path.exists("preprocessed_descriptors"):
                 os.makedirs("preprocessed_descriptors")
-            np.save(descriptors_file_path, descriptors=descriptors)
+            np.save(descriptors_file_path, descriptors)
 
 
         descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean'))
@@ -311,4 +320,4 @@ class Evaluator:
         print(f"* num_revist: {sum(self.revist)}")
         print(f"* TP: {F1_TP}, TN: {F1_TN}, FP: {F1_FP}, FN: {F1_FN}")
         # print(f"* Best F1-Score:\t {max_f1_score}, at that metrics:\n*\t", df[df["F1-Score"] == max_f1_score])
-        return max_f1_score_idx
+        return max_f1_score_idx, [max_f1_score, corresponding_recall, corresponding_accuracy, corresponding_threshold]

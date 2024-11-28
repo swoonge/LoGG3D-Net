@@ -175,6 +175,42 @@ class OverlapGATv2(nn.Module):
                 if neighbor != i:
                     edges.append((i, neighbor))
         return torch.tensor(edges, dtype=torch.long).t().contiguous()
+    
+    def forward_inference(self, x_l):
+        out_l = self.relu(self.conv1(x_l))
+        out_l = self.relu(self.conv2(out_l))
+        out_l = self.relu(self.conv3(out_l))
+        out_l = self.relu(self.conv4(out_l))
+        out_l = self.relu(self.conv5(out_l))
+        out_l = self.relu(self.conv6(out_l))
+        out_l = self.relu(self.conv7(out_l))
+        out_l = self.relu(self.conv8(out_l))
+        out_l = self.relu(self.conv9(out_l))
+        if self.x_high >= 32:
+            out_l = self.relu(self.conv10(out_l))
+        if self.x_high >= 64:
+            out_l = self.relu(self.conv11(out_l)) # [batch, 128, 1, 900]
+
+        out_l = self.relu(self.convLast1(out_l)) # [batch, 256, 1, 900]
+
+        _, _, _, num_queries = out_l.size()
+        out_l = out_l.permute(0, 3, 1, 2).squeeze(3) # [batch, query, feature_dim]
+
+        edge_index = self.create_edges(num_queries).to(out_l.device)
+        node_features = out_l[0]
+        gat_out = self.gat_conv1(node_features, edge_index) # [num_queries, feature_dim(256)]
+        gat_out = self.gat_conv2(gat_out, edge_index) # [num_queries, feature_dim(512)]
+        gat_out = self.gat_conv3(gat_out, edge_index) # [num_queries, feature_dim(512)]
+
+        out_l = gat_out.unsqueeze(0) # [1, num_queries, feature_dim(512)]
+        out_l = out_l.permute(0, 2, 1).unsqueeze(3) # [1, feature_dim(512), num_queries, 1]
+
+        out_l = self.relu(self.convLast2(out_l)) # [1, 1024, num_queries, 1]
+        out_l = F.normalize(out_l, dim=1)
+        out_l = self.net_vlad(out_l)
+        out_l = F.normalize(out_l, dim=1)
+
+        return out_l
 
     def forward(self, x_l):
         out_l = self.relu(self.conv1(x_l))

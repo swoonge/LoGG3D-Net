@@ -31,8 +31,8 @@ class KittiDataset(PointCloudDataset):
         self.timestamps_dict = {}
         self.files = []
 
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]  # 드라이브 ID 리스트 생성
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]  # 드라이브 ID 리스트 생성
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True)  # 드라이브 ID에 해당하는 파일 리스트 로드
             id_file_dict = {}  # 쿼리 ID와 파일 매핑을 저장하는 딕셔너리 초기화
             for query_id, file in enumerate(files):
@@ -137,8 +137,8 @@ class KittiTupleDataset(KittiDataset):
         self.kitti_seq_lens = config.kitti_seq_lens
 
         self.files = []
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
+        for drive_id in self.drive_ids:
             for query_id in range(len(self.id_file_dicts[drive_id])):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)

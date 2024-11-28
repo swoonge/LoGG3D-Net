@@ -33,8 +33,8 @@ class KittiDepthImageDataset(PointCloudDataset):
         self.timestamps_dict = {}
         self.files = []
 
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True)
             id_file_dict = {} 
             for query_id, file in enumerate(files):
@@ -165,8 +165,8 @@ class KittiDepthImageTupleDataset(KittiDepthImageDataset):
         self.kitti_seq_lens = config.kitti_seq_lens
         
         self.files = []
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.kitti_data_split[phase]]
+        for drive_id in self.drive_ids:
             for query_id in range(len(self.id_file_dicts[drive_id])):
                 positives = self.get_positives(drive_id, query_id)
                 negatives = self.get_negatives(drive_id, query_id)

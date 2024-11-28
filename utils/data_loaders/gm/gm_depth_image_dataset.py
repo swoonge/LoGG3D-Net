@@ -28,16 +28,20 @@ class GMDepthImageDataset(PointCloudDataset):
         self.logger.info(f"Initializing Dataset with {self.image_folder} folder")
 
         self.id_file_dicts = {}
+        self.poses_dict = {}
+        self.timestamps_dict = {}
         self.files = []
 
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True)
             id_file_dict = {} 
             for query_id, file in enumerate(files):
                 self.files.append((drive_id, query_id))
                 id_file_dict[query_id] = file.split('.')[0]+'.npy'
             self.id_file_dicts[drive_id] = id_file_dict
+            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
+            self.timestamps_dict[drive_id] = load_kitti_timestamps(self.root, drive_id)
 
     def get_npy_fn(self, drive, file):
         fname = os.path.join(self.root, 'sequences', drive, self.image_folder, file)
@@ -98,8 +102,8 @@ class GMDepthImageTupleDataset(GMDepthImageDataset):
         self.gm_seq_lens = config.gm_seq_lens
         
         self.files = []
-        drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
-        for drive_id in drive_ids:
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
+        for drive_id in self.drive_ids:
             files = load_kitti_files(self.root, drive_id, is_sorted=True)
             for query_id, file in enumerate(files):
                 positives = self.get_positives(drive_id, query_id)
