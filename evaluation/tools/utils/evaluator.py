@@ -123,7 +123,7 @@ class Evaluator:
         elif 'NCLT' in self.args.dataset:
             self.pose_threshold = [3.0, 20.0]
             if self.test_for_val_set:
-                self.args.nclt_data_split['test'] = self.args.nclt_data_split['val']
+                self.args.nclt_data_split['test'][0] = "2012-01-15" if self.args.nclt_data_split['test'][0] == self.args.nclt_data_split['val'][0] else self.args.nclt_data_split['val'][0]
             self.sequence = self.args.nclt_data_split['test'][0]
             if "Overlap" in self.args.pipeline:
                 self.args.dataset = 'NCLTDepthImageDataset'

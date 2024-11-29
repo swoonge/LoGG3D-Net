@@ -13,13 +13,14 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'OverlapViT')
+pipeline_default = os.getenv('PIPELINE', 'OverlapTransformer')
                                         # LOGG3D
                                         # OverlapTransformer
                                         # OverlapNetTransformer
                                         # OverlapTransformer_geo
                                         # CVTNet
                                         # OverlapGAT
+                                        # OverlapGATv2
                                         # OverlapViT
 dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
@@ -28,7 +29,7 @@ dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGAT_default_kitti00test')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OT_default_kitti08_random_rotation')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -63,7 +64,7 @@ loss_arg.add_argument('--scene_loss_weight', type=float, default=1.0) # 0.1
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
 opt_arg.add_argument('--max_epoch', type=int, default=50)  # 20
-opt_arg.add_argument('--base_learning_rate', type=float, default=5e-6) # LoGG3D: 1e-3, OT: 5e-6 
+opt_arg.add_argument('--base_learning_rate', type=float, default=5e-6) # LoGG3D: 1e-3, OT: 5e-6, GAT: 5e-5
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 opt_arg.add_argument('--scheduler', type=str, default='step') 
                                                     #cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
@@ -85,7 +86,7 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default=
                         {   "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
                             "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default=
-                        {'train': [3, 4, 5, 6, 7, 8, 9, 10], 'val': [2], 'test': [0]})
+                        {'train': [0, 3, 4, 5, 6, 7, 9, 10], 'val': [2], 'test': [8]})
 
 # MulRan Dataset
 data_arg.add_argument('--mulran_dir', type=str, default='/media/vision/SSD1/Datasets/MulRan', help="Path to the MulRan dataset")
@@ -123,7 +124,7 @@ data_arg.add_argument('--nclt_seq_lens', type=dict, default={
     })
 data_arg.add_argument('--nclt_data_split', type=dict, default={
     'train': ["2012-01-08"],
-    'val': ["2012-02-05"],
+    'val': ["2012-01-15"],
     'test': ["2012-02-05"]
     })
 

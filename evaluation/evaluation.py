@@ -61,6 +61,7 @@ if __name__ == '__main__':
         # ['OverlapTransformer/2024-11-22_19-16-43_OT_default_kitti00',['epoch_best_30.pth', 'epoch_best_36.pth']],
         # ['OverlapTransformer/2024-11-22_19-23-31_OT_default_kitti05',['epoch_30.pth', 'epoch_best_40.pth']],
         # ['OverlapTransformer/2024-11-22_19-24-19_OT_default_kitti08',['epoch_best_30.pth', 'epoch_best_36.pth']],
+        # ['OverlapTransformer/2024-11-28_10-19-41_OT_default_kitti08_random_rotation', ['epoch_best_30.pth', 'epoch_best_36.pth']],
         # ['OverlapTransformer/2024-11-22_12-13-26_OT_default_gm02', ['epoch_30.pth', 'epoch_best_49.pth']],
         # ['OverlapTransformer/2024-11-22_12-14-03_OT_default_gm03', ['epoch_30.pth', 'epoch_best_49.pth']],
         # ['OverlapTransformer/2024-11-25_11-52-28_OT_default_nclt', ['epoch_best_30.pth', 'epoch_best_42.pth']],
@@ -73,10 +74,19 @@ if __name__ == '__main__':
         # ['OverlapNetTransformer/2024-11-22_12-07-08_OLT_default_gm03', ['epoch_30.pth', 'epoch_best_41.pth']],
         # ['OverlapNetTransformer/2024-11-25_11-06-28_OLT_default_nclt', ['epoch_30.pth', 'epoch_best_48.pth']],
 
+        # CVTNet
+        ['CVTNet/2024-11-26_20-08-56_CVTNet_default_kitti00', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        ['CVTNet/2024-11-26_11-11-57_CVTNet_default_kitti05', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        ['CVTNet/2024-11-26_11-13-05_CVTNet_default_kitti08', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        ['CVTNet/2024-11-26_12-08-27_CVTNet_default_kitti08_random_rotation', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        ['CVTNet/2024-11-25_11-30-07_CVTNet_default_gm02', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        ['CVTNet/2024-11-25_11-30-07_CVTNet_default_gm02', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+        # ['CVTNet/2024-11-25_11-11-42_CVTNet_default_nclt', ['epoch_best_30.pth', 'epoch_best_36.pth']],
+
         # # OverlapGAT
         # ['OverlapGAT/2024-11-25_13-23-14_OTGAT_default_kitti00test', ['epoch_best_30.pth']],
 
-        # OverlapGATv2
-        ['OverlapGATv2/2024-11-27_13-03-36_OTGATv2_default_kitti00', ['epoch_44.pth']],
+        # # OverlapGATv2
+        # ['OverlapGATv2/2024-11-27_13-03-36_OTGATv2_default_kitti00', ['epoch_44.pth']],
     ]
     __main__(test_models_list, test_all=True, test_for_val_set=True)
