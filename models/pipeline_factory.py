@@ -9,7 +9,7 @@ from pipelines.overlap_transformer_resnet import *
 from pipelines.overlap_transformer_ViT import *
 from pipelines.overlap_transformer_geo import *
 from pipelines.cvtnet import CVTNet
-from pipelines.overlap_gat import OverlapGAT, OverlapGATv2
+from pipelines.overlap_gat import OverlapGAT, OverlapGATv2, OverlapGATv2_5#, OverlapGATv3
 from pipelines.overlap_vit import OverlapViT
 
 
@@ -34,6 +34,10 @@ def get_pipeline(cfg):
         pipeline = OverlapGAT(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapGATv2':
         pipeline = OverlapGATv2(channels=1, use_transformer=True)
+    elif cfg.pipeline == 'OverlapGATv2_5':
+        pipeline = OverlapGATv2_5(channels=1, use_transformer=True)
+    # elif cfg.pipeline == 'OverlapGATv3':
+    #     pipeline = OverlapGATv3(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapViT':
         pipeline = OverlapViT(channels=1)
     return pipeline

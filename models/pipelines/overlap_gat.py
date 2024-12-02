@@ -129,30 +129,47 @@ class OverlapGAT(nn.Module):
         return out_l
 
 
+
+class ConvBlock(nn.Module):
+    """A basic convolutional block with ReLU."""
+    def __init__(self, in_channels, out_channels, kernel_size, stride, norm_layer=None):
+        super(ConvBlock, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, bias=False)
+        self.norm = norm_layer(out_channels) if norm_layer is not None else None
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.norm is not None:
+            x = self.norm(x)
+        return self.relu(x)
+
+
 class OverlapGATv2(nn.Module):
     def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer=True):
         super(OverlapGATv2, self).__init__()
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-
         self.x_high = height
         self.use_transformer = use_transformer
 
-        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5, 1), stride=(1, 1), bias=False)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 1), stride=(2, 1), bias=False)
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=(3, 1), stride=(2, 1), bias=False)
-        self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 1), stride=(2, 1), bias=False)
-        self.conv5 = nn.Conv2d(64, 128, kernel_size=(2, 1), stride=(2, 1), bias=False)
-        self.conv6 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
-        self.conv7 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
-        self.conv8 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
-        self.conv9 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
-        self.conv10 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
-        self.conv11 = nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
         self.relu = nn.ReLU(inplace=True)
 
-        self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        self.bnLast1 = norm_layer(256)
+        # Convolutional layers
+        self.conv_blocks = nn.ModuleList([
+            ConvBlock(channels, 16, kernel_size=(5, 1), stride=(1, 1)),
+            ConvBlock(16, 32, kernel_size=(3, 1), stride=(2, 1)),
+            ConvBlock(32, 64, kernel_size=(3, 1), stride=(2, 1)),
+            ConvBlock(64, 64, kernel_size=(3, 1), stride=(2, 1)),
+            ConvBlock(64, 128, kernel_size=(2, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1)),
+            ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1))])
+
+        self.convLast1 = ConvBlock(128, 256, kernel_size=(1, 1), stride=(1, 1))
         self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.bnLast2 = norm_layer(1024)
 
@@ -161,91 +178,89 @@ class OverlapGATv2(nn.Module):
         self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=900, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
-
+        
         # Graph Attention Network (GATv2Conv)
         self.gat_conv1 = GATv2Conv(256, 256, residual=True, dropout=0.1)
         self.gat_conv2 = GATv2Conv(256, 512, residual=True, dropout=0.1)
         self.gat_conv3 = GATv2Conv(512, 512, residual=True, dropout=0.1)
+        
+    def apply_convs(self, x):
+        """Apply convolutional blocks based on input height."""
+        num_layers_to_apply = 9
+        if self.x_high >= 32:
+            num_layers_to_apply += 1
+        if self.x_high >= 64:
+            num_layers_to_apply += 1
 
-    def create_edges(self, num_nodes):
+        for i in range(num_layers_to_apply):
+            x = self.conv_blocks[i](x)
+        return x
+
+    def create_edges(self, num_nodes, range_size=30):
         edges = []
         for i in range(num_nodes):
-            for j in range(-15, 15):  # Connect 90 nodes in total, 45 before and 45 after
-                neighbor = (i + j) % num_nodes  # Rotational handling for the ends
+            for j in range(int(-range_size/2), int(range_size/2 + 1)):  # Connect range_size nodes before and after
+                neighbor = (i + j) % num_nodes  # Rotational handling
                 if neighbor != i:
                     edges.append((i, neighbor))
         return torch.tensor(edges, dtype=torch.long).t().contiguous()
-    
-    def forward_inference(self, x_l):
-        out_l = self.relu(self.conv1(x_l))
-        out_l = self.relu(self.conv2(out_l))
-        out_l = self.relu(self.conv3(out_l))
-        out_l = self.relu(self.conv4(out_l))
-        out_l = self.relu(self.conv5(out_l))
-        out_l = self.relu(self.conv6(out_l))
-        out_l = self.relu(self.conv7(out_l))
-        out_l = self.relu(self.conv8(out_l))
-        out_l = self.relu(self.conv9(out_l))
-        if self.x_high >= 32:
-            out_l = self.relu(self.conv10(out_l))
-        if self.x_high >= 64:
-            out_l = self.relu(self.conv11(out_l)) # [batch, 128, 1, 900]
 
-        out_l = self.relu(self.convLast1(out_l)) # [batch, 256, 1, 900]
+    def forward(self, x_l):
+        # Convolutional processing
+        out_l = self.apply_convs(x_l)
+        out_l = self.convLast1(out_l)  # [batch, 256, 1, width]
+        batch_size, _, _, num_queries = out_l.size()
+        out_l = out_l.permute(0, 3, 1, 2).squeeze(3)  # [batch, query, feature_dim]
 
-        _, _, _, num_queries = out_l.size()
-        out_l = out_l.permute(0, 3, 1, 2).squeeze(3) # [batch, query, feature_dim]
+        out_list = []
 
-        edge_index = self.create_edges(num_queries).to(out_l.device)
-        node_features = out_l[0]
-        gat_out = self.gat_conv1(node_features, edge_index) # [num_queries, feature_dim(256)]
-        gat_out = self.gat_conv2(gat_out, edge_index) # [num_queries, feature_dim(512)]
-        gat_out = self.gat_conv3(gat_out, edge_index) # [num_queries, feature_dim(512)]
+        edge_index = self.create_edges(num_queries, num_queries/30).to(out_l.device)
+        for i in range(batch_size):
+            node_features = out_l[i]  # [num_queries, feature_dim]
+            node_features = self.gat_conv1(node_features, edge_index)
+            node_features = self.gat_conv2(node_features, edge_index)
+            node_features = self.gat_conv3(node_features, edge_index)
+            out_list.append(node_features)
 
-        out_l = gat_out.unsqueeze(0) # [1, num_queries, feature_dim(512)]
-        out_l = out_l.permute(0, 2, 1).unsqueeze(3) # [1, feature_dim(512), num_queries, 1]
+        out_l = torch.stack(out_list, dim=0)  # [batch_size, num_queries, feature_dim]
+        out_l = out_l.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim(512), num_queries, 1]
 
-        out_l = self.relu(self.convLast2(out_l)) # [1, 1024, num_queries, 1]
+        out_l = self.relu(self.convLast2(out_l)) # [batch, 1024, num_queries, 1]
         out_l = F.normalize(out_l, dim=1)
         out_l = self.net_vlad(out_l)
         out_l = F.normalize(out_l, dim=1)
 
         return out_l
+    
+class OverlapGATv2_5(OverlapGATv2):
+    def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer=True):
+        # super(OverlapGATv2, self).__init__(height=height, width=width, channels=channels, norm_layer=norm_layer, use_transformer=use_transformer)
+        OverlapGATv2.__init__(self, height=height, width=width, channels=channels, norm_layer=norm_layer, use_transformer=use_transformer)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.)
+        self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
 
     def forward(self, x_l):
-        out_l = self.relu(self.conv1(x_l))
-        out_l = self.relu(self.conv2(out_l))
-        out_l = self.relu(self.conv3(out_l))
-        out_l = self.relu(self.conv4(out_l))
-        out_l = self.relu(self.conv5(out_l))
-        out_l = self.relu(self.conv6(out_l))
-        out_l = self.relu(self.conv7(out_l))
-        out_l = self.relu(self.conv8(out_l))
-        out_l = self.relu(self.conv9(out_l))
-        if self.x_high >= 32:
-            out_l = self.relu(self.conv10(out_l))
-        if self.x_high >= 64:
-            out_l = self.relu(self.conv11(out_l)) # [batch, 128, 1, 900]
-
-        out_l = self.relu(self.convLast1(out_l)) # [batch, 256, 1, 900]
-
+        # Convolutional processing
+        out_l = self.apply_convs(x_l)
+        out_l = self.convLast1(out_l)  # [batch, 256, 1, width]
         batch_size, _, _, num_queries = out_l.size()
-        out_l = out_l.permute(0, 3, 1, 2).squeeze(3)# [batch, query, feature_dim]
+        out_l = out_l.permute(0, 3, 1, 2).squeeze(3)  # [batch, query, feature_dim]
 
-        edge_index = self.create_edges(num_queries).to(out_l.device)
         out_list = []
 
+        edge_index = self.create_edges(num_queries, num_queries/30).to(out_l.device)
         for i in range(batch_size):
-            node_features = out_l[i]
-            gat_out = self.gat_conv1(node_features, edge_index) # [num_queries, feature_dim(256)]
-            gat_out = self.gat_conv2(gat_out, edge_index) # [num_queries, feature_dim(512)]
-            gat_out = self.gat_conv3(gat_out, edge_index) # [num_queries, feature_dim(512)]
-            out_list.append(gat_out)
-
-        out_l = torch.stack(out_list, dim=0) # [batch, num_queries, feature_dim(512)]
+            node_features = out_l[i]  # [num_queries, feature_dim]
+            node_features = self.gat_conv1(node_features, edge_index)
+            # node_features = self.gat_conv2(node_features, edge_index)
+            # node_features = self.gat_conv3(node_features, edge_index)
+            out_list.append(node_features)
+        out_l = torch.stack(out_list, dim=0)  # [batch_size, num_queries, feature_dim]
+        out_l_1 = out_l
+        out_l = self.transformer_encoder(out_l)
+        out_l = torch.cat((out_l_1, out_l), dim=2)
         out_l = out_l.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim(512), num_queries, 1]
 
-        # out_l = torch.cat((out_l_1, out_l), dim=1) # 기존의 residual을 없애고, GATv2Conv 자체의 학습 가능한 residual 옵션을 활용
         out_l = self.relu(self.convLast2(out_l)) # [batch, 1024, num_queries, 1]
         out_l = F.normalize(out_l, dim=1)
         out_l = self.net_vlad(out_l)
@@ -253,7 +268,212 @@ class OverlapGATv2(nn.Module):
 
         return out_l
 
+from torch_geometric.data import Batch, Data
+ 
+class OverlapGATv22(nn.Module):
+    def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer=True, cluster_size=64, vlad_dim=256):
+        super(OverlapGATv22, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
 
+        self.x_high = height
+        self.use_transformer = use_transformer
+
+        # Conv layers
+        self.conv_layers = nn.ModuleList([
+            nn.Conv2d(channels, 16, kernel_size=(5, 1), stride=(1, 1), bias=False),
+            nn.Conv2d(16, 32, kernel_size=(3, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(32, 64, kernel_size=(3, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(64, 64, kernel_size=(3, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(64, 128, kernel_size=(2, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False),
+            nn.Conv2d(128, 128, kernel_size=(1, 1), stride=(2, 1), bias=False)
+        ])
+        self.relu = nn.ReLU(inplace=True)
+
+        self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.bnLast1 = norm_layer(256)
+        self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.bnLast2 = norm_layer(1024)
+
+        self.linear = nn.Linear(128 * width, 256)
+
+        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=width, cluster_size=cluster_size,
+                                     output_dim=vlad_dim, gating=True, add_batch_norm=False,
+                                     is_training=True)
+
+        # Graph Attention Network (GATv2Conv)
+        self.gat_conv1 = GATv2Conv(256, 256, residual=True, dropout=0.1)
+        self.gat_conv2 = GATv2Conv(256, 512, residual=True, dropout=0.1)
+        self.gat_conv3 = GATv2Conv(512, 512, residual=True, dropout=0.1)
+
+    def apply_convs(self, x, conv_layers):
+        for conv in conv_layers:
+            x = self.relu(conv(x))
+        return x
+
+    def create_edges(self, num_nodes, range_size=15):
+        edges = []
+        for i in range(num_nodes):
+            for j in range(-range_size, range_size + 1):  # Connect range_size nodes before and after
+                neighbor = (i + j) % num_nodes  # Rotational handling
+                if neighbor != i:
+                    edges.append((i, neighbor))
+        return torch.tensor(edges, dtype=torch.long).t().contiguous()
+
+    def forward(self, x_l):
+        # Apply convolution layers based on input height
+        num_layers_to_apply = 9
+        if self.x_high >= 32:
+            num_layers_to_apply += 1
+        if self.x_high >= 64:
+            num_layers_to_apply += 1
+
+        out_l = self.apply_convs(x_l, self.conv_layers[:num_layers_to_apply])
+
+        out_l = self.relu(self.convLast1(out_l))  # [batch, 256, 1, width]
+        batch_size, _, _, num_queries = out_l.size()
+        out_l = out_l.permute(0, 3, 1, 2).squeeze(3)  # [batch, query, feature_dim]
+
+        # Create edges for graph
+        edge_index = self.create_edges(num_queries).to(out_l.device)
+
+        # Create Data objects for each graph in the batch
+        batch_list = [
+            Data(x=out_l[i], edge_index=edge_index) for i in range(batch_size)
+        ]
+        
+        # Combine into a single batch
+        batched_graph = Batch.from_data_list(batch_list)
+
+        # GAT processing
+        gat_out = self.gat_conv1(batched_graph.x, batched_graph.edge_index)
+        gat_out = self.gat_conv2(gat_out, batched_graph.edge_index)
+        gat_out = self.gat_conv3(gat_out, batched_graph.edge_index)
+
+        # Reshape back to batch format
+        gat_out = gat_out.view(batch_size, num_queries, -1)  # [batch, num_queries, feature_dim]
+        out_l = gat_out.permute(0, 2, 1).unsqueeze(3)  # [batch, feature_dim, num_queries, 1]
+
+        out_l = self.relu(self.convLast2(out_l))  # [batch, 1024, num_queries, 1]
+        out_l = F.normalize(out_l, dim=1)
+        out_l = self.net_vlad(out_l)
+        out_l = F.normalize(out_l, dim=1)
+
+        return out_l
+
+# class ConvBlock(nn.Module):
+#     """A basic convolutional block with ReLU."""
+#     def __init__(self, in_channels, out_channels, kernel_size, stride, norm_layer=None):
+#         super(ConvBlock, self).__init__()
+#         if norm_layer is None:
+#             norm_layer = nn.BatchNorm2d
+#         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, bias=False)
+#         self.norm = norm_layer(out_channels)
+#         self.relu = nn.ReLU(inplace=True)
+
+#     def forward(self, x):
+#         return self.relu(self.norm(self.conv(x)))
+
+
+# class GATBlock(nn.Module):
+#     """Graph Attention Network (GAT) block."""
+#     def __init__(self, in_dim, out_dim, dropout=0.1):
+#         super(GATBlock, self).__init__()
+#         self.gat = GATv2Conv(in_dim, out_dim, residual=True, dropout=dropout)
+
+#     def forward(self, x, edge_index):
+#         return self.gat(x, edge_index)
+
+
+# class OverlapGATv3(nn.Module):
+#     def __init__(self, height=64, width=900, channels=5, norm_layer=None, use_transformer=True, cluster_size=64, vlad_dim=256):
+#         super(OverlapGATv3, self).__init__()
+#         if norm_layer is None:
+#             norm_layer = nn.BatchNorm2d
+
+#         self.x_high = height
+#         self.use_transformer = use_transformer
+
+#         # Convolutional layers
+#         self.conv_blocks = nn.ModuleList([
+#             ConvBlock(channels, 16, kernel_size=(5, 1), stride=(1, 1), norm_layer=norm_layer),
+#             ConvBlock(16, 32, kernel_size=(3, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(32, 64, kernel_size=(3, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(64, 64, kernel_size=(3, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(64, 128, kernel_size=(2, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer),
+#             ConvBlock(128, 128, kernel_size=(1, 1), stride=(2, 1), norm_layer=norm_layer)
+#         ])
+
+#         self.convLast1 = ConvBlock(128, 256, kernel_size=(1, 1), stride=(1, 1), norm_layer=norm_layer)
+#         self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
+#         self.bnLast2 = norm_layer(1024)
+
+#         self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=width, cluster_size=cluster_size,
+#                                      output_dim=vlad_dim, gating=True, add_batch_norm=False,
+#                                      is_training=True)
+
+#         # GAT layers
+#         self.gat_blocks = nn.ModuleList([
+#             GATBlock(256, 256, dropout=0.1),
+#             GATBlock(256, 512, dropout=0.1),
+#             GATBlock(512, 512, dropout=0.1)
+#         ])
+
+#     def create_edges(self, num_nodes, range_size=15):
+#         edges = []
+#         for i in range(num_nodes):
+#             for j in range(-range_size, range_size + 1):  # Connect range_size nodes before and after
+#                 neighbor = (i + j) % num_nodes  # Rotational handling
+#                 if neighbor != i:
+#                     edges.append((i, neighbor))
+#         return torch.tensor(edges, dtype=torch.long).t().contiguous()
+
+#     def apply_convs(self, x):
+#         """Apply convolutional blocks based on input height."""
+#         num_layers_to_apply = 9
+#         if self.x_high >= 32:
+#             num_layers_to_apply += 1
+#         if self.x_high >= 64:
+#             num_layers_to_apply += 1
+
+#         for i in range(num_layers_to_apply):
+#             x = self.conv_blocks[i](x)
+#         return x
+
+#     def forward(self, x_l):
+#         # Convolutional processing
+#         out_l = self.apply_convs(x_l)
+#         out_l = self.convLast1(out_l)  # [batch, 256, 1, width]
+#         batch_size, _, _, num_queries = out_l.size()
+#         out_l = out_l.permute(0, 3, 1, 2).squeeze(3)  # [batch, query, feature_dim]
+
+#         # Create edges for graph
+#         edge_index = self.create_edges(num_queries).to(out_l.device)
+
+#         # GAT processing
+#         for gat_block in self.gat_blocks:
+#             out_l = gat_block(out_l, edge_index)
+
+#         out_l = out_l.view(batch_size, num_queries, -1).permute(0, 2, 1).unsqueeze(3)  # [batch, feature_dim, num_queries, 1]
+
+#         out_l = F.relu(self.bnLast2(self.convLast2(out_l)))  # [batch, 1024, num_queries, 1]
+#         out_l = F.normalize(out_l, dim=1)
+#         out_l = self.net_vlad(out_l)
+#         out_l = F.normalize(out_l, dim=1)
+
+#         return out_l
+
+    
 # if __name__ == '__main__':
 #     # load config ================================================================
 #     config_filename = '../config/config.yml'

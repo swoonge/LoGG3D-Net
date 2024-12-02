@@ -46,6 +46,8 @@ def main():
         cfg.dataset = 'KittiDataset'
     if "Overlap" in cfg.pipeline:
         cfg.dataset = 'KittiDepthImageDataset'
+    if "CVT" in cfg.pipeline:
+        cfg.dataset = 'KittiDepthImageDataset'
     
     loader = make_data_loader(cfg,
                                 cfg.test_phase,

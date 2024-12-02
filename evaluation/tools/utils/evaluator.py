@@ -72,7 +72,7 @@ def calculate_pose_distances_with_pdist(poses):
 
 # @torch.no_grad()
 class Evaluator:
-    def __init__(self, checkpoint_path, test_dataset_forced=None, test_for_val_set=False) -> None:
+    def __init__(self, checkpoint_path, test_dataset_forced=None, test_seq_forced=None, test_for_val_set=False) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.test_dataset_forced = test_dataset_forced
         self.test_for_val_set = test_for_val_set
@@ -81,7 +81,8 @@ class Evaluator:
         try:
             self.args = self.checkpoint['config']
         except Exception as e:
-            self.args = get_config_eval()
+            self.args = get_config()
+        # self.args = get_config() >> for pretrained model
 
         self.args.kitti_dir = '/media/vision/SSD1/Datasets/kitti/dataset'
         self.args.gm_dir = '/media/vision/SSD1/Datasets/gm_datasets'
@@ -103,11 +104,14 @@ class Evaluator:
             self.pose_threshold = [3.0, 20.0]
             if self.test_for_val_set:
                 self.args.kitti_data_split['test'] = self.args.kitti_data_split['val']
-            self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
             # self.sequence = f"{int(checkpoint_path.split('.')[-2][-1]):02d}" # for Logg3D pretrained
             # self.args.kitti_data_split['test'] = [int(checkpoint_path.split('.')[-2][-1])] # for Logg3D pretrained
-            self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
-            if "Overlap" in self.args.pipeline:
+            # self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
+            # self.args.kitti_eval_seq = 0 # for pretrained model
+            if test_seq_forced is not None:
+                self.args.kitti_data_split['test'][0] = test_seq_forced
+            self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
                 self.args.dataset = 'KittiDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'KittiSparseTupleDataset'
@@ -116,7 +120,7 @@ class Evaluator:
             if self.test_for_val_set:
                 self.args.gm_data_split['test'] = self.args.gm_data_split['val']
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
-            if "Overlap" in self.args.pipeline:
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
                 self.args.dataset = 'GMDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'GMSparseTupleDataset'
@@ -125,7 +129,10 @@ class Evaluator:
             if self.test_for_val_set:
                 self.args.nclt_data_split['test'][0] = "2012-01-15" if self.args.nclt_data_split['test'][0] == self.args.nclt_data_split['val'][0] else self.args.nclt_data_split['val'][0]
             self.sequence = self.args.nclt_data_split['test'][0]
-            if "Overlap" in self.args.pipeline:
+            if test_seq_forced is not None:
+                self.args.nclt_data_split['test'][0] = test_seq_forced
+                self.sequence = self.args.nclt_data_split['test'][0]
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
                 self.args.dataset = 'NCLTDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'NCLTSparseTupleDataset'
@@ -172,8 +179,10 @@ class Evaluator:
                 os.makedirs("preprocessed_descriptors")
             np.save(descriptors_file_path, descriptors)
 
+        # # must make descriptors test
+        # descriptors = self._make_descriptors()
 
-        descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean'))
+        descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean')) #euclidean
         top_matchings = self._find_matching_poses(timestamps, descriptor_distances_matrix, pose_distances_matrix)
         
         metrics_list = self._calculate_metrics(top_matchings)
@@ -202,17 +211,15 @@ class Evaluator:
                     input_t = input_t.unsqueeze(0)[:, 0, :, :].unsqueeze(1)
                 else:
                     input_t = input_t.unsqueeze(0).unsqueeze(0)
+
                 output_desc = self.model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
-            elif self.args.pipeline == 'CVTNet':
-                # current_batch = batch.type(torch.FloatTensor).to(device=self.device) # [6,1,64,900]
-                # batch -> [[10,32,900], {'sequence': ".", 'timestamp': .}]
+            elif 'CVT' in self.args.pipeline:
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
                 input_t = input_t.unsqueeze(0)
-
                 output_desc = self.model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
