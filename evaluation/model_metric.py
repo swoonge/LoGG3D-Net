@@ -78,7 +78,7 @@ def main():
                 data = torch.tensor(batch[0][0])
                 data = data.type(torch.FloatTensor).unsqueeze(0).to(device) if 'CVT' in cfg.pipeline else data.unsqueeze(0).unsqueeze(0).to(device)
                 processing_timer.tic()
-                output = model.forward_inference(data) if 'GAT' in cfg.pipeline else model(data)
+                output = model(data) if 'GAT' in cfg.pipeline else model(data)
             processing_timer.toc()
    
         

@@ -268,6 +268,7 @@ class OverlapGATv2_5(OverlapGATv2):
         out_list = []
 
         edge_index = self.create_edges(num_queries, num_queries/30).to(out_l.device)
+        
         for i in range(batch_size):
             node_features = out_l[i]  # [num_queries, feature_dim]
             node_features = self.gat_conv1(node_features, edge_index)

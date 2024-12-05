@@ -13,7 +13,7 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'LOGG3D_kpfcnn')
+pipeline_default = os.getenv('PIPELINE', 'OverlapGATNet')
                                         # LOGG3D
                                         # OverlapTransformer
                                         # OverlapNetTransformer
@@ -24,7 +24,7 @@ pipeline_default = os.getenv('PIPELINE', 'LOGG3D_kpfcnn')
                                         # OverlapGATv2_5
                                         # OverlapGATv3
                                         # OverlapViT
-                                        # LOGG3D_kpfcnn
+                                        # OverlapGATNet
 dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
                                       # KittirtpCoordinateTupleDataset(LOGG3D_kpfcnn)
@@ -33,7 +33,7 @@ dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGATv22_gm02')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGATNet_test')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
