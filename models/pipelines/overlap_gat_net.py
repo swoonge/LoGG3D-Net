@@ -212,16 +212,16 @@ class PyramidResnetCNN(nn.Module):
 
         # Feature extraction layers with strides and pooling to reduce patch count
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
+        self.bn1 = nn.GroupNorm(32)
         self.res_block1 = ResidualBlock(32)
 
         # Downsample using stride and pooling
         self.downsample1 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False)  # Reduce spatial size by half
-        self.bn_down1 = nn.BatchNorm2d(64)
+        self.bn_down1 = nn.GroupNorm(64)
         self.res_block2 = ResidualBlock(64)
 
         self.downsample2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)  # Reduce spatial size by half
-        self.bn_down2 = nn.BatchNorm2d(128)
+        self.bn_down2 = nn.GroupNorm(128)
         self.res_block3 = ResidualBlock(128)
 
         # Pooling to further reduce spatial dimensions while preserving information
