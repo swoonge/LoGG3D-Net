@@ -80,7 +80,8 @@ def main():
                 processing_timer.tic()
                 output = model(data) if 'GAT' in cfg.pipeline else model(data)
             processing_timer.toc()
-   
+        times_np = np.array(model.times)
+        print("average time: ", np.mean(times_np))
         
         logger.info('[Model info]')
         logger.info('    Training pipeline: ' + cfg.pipeline)
