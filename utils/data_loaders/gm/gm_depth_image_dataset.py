@@ -5,6 +5,8 @@ import numpy as np
 from utils.data_loaders.pointcloud_dataset import *
 from utils.data_utils.utils import *
 
+import cv2
+
 class GMDepthImageDataset(PointCloudDataset):
     r"""
     Generate single pointcloud frame from gm odometry dataset. 
@@ -50,6 +52,41 @@ class GMDepthImageDataset(PointCloudDataset):
     def get_npy_file(self, drive_id, pc_id):
         return np.load(self.get_npy_fn(drive_id, self.id_file_dicts[drive_id][pc_id]))
     
+    def reduce_channel(self, range_image, target_channel):
+        """
+        채널 수를 감소시켜 target_channel에 맞추되, 선택한 채널만 남기고 나머지 채널은 검은색(0)으로 설정합니다.
+        
+        Args:
+            range_image (numpy.ndarray): 원본 range image (C, W) 형태의 배열.
+            target_channel (int): 유지하고자 하는 채널 수.
+        
+        Returns:
+            numpy.ndarray: 채널을 줄인 후 크기를 유지한 range image (C, W) 형태의 배열.
+        """
+        # 현재 채널 수와 너비
+        current_channel, _ = range_image.shape
+        
+        # 간격 계산
+        step = current_channel // target_channel
+        
+        ## 입력과 같은 크기의 이미지 반환
+        # # 초기화된 0 배열 (검은색 채널로 설정)
+        # reduced_range_image = np.zeros_like(range_image)
+        # # 선택한 채널만 복사
+        # reduced_range_image[::step, :] = range_image[::step, :]
+
+        ## 줄어든 체널에 따라 이미지 크기 조정
+        # 간격에 따라 채널 선택
+        reduced_range_image = range_image[::step, :]
+        # 만약 초과로 선택되었을 경우 초과 채널을 잘라냄
+        reduced_range_image = reduced_range_image[:target_channel, :]
+
+        # 원래 이미지 크기로 resize
+        original_shape = range_image.shape
+        reduced_range_image = cv2.resize(reduced_range_image, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_LINEAR)
+        
+        return reduced_range_image
+    
     def random_rotate_images(self, depth_images):
         angle = random.randint(0, self.rotation_range)
 
@@ -69,6 +106,7 @@ class GMDepthImageDataset(PointCloudDataset):
         drive_id, query_id  = self.files[idx]
 
         xyz0_th = self.get_npy_file(drive_id, query_id)
+        # xyz0_th = self.reduce_channel(xyz0_th, 16)
         meta_info = {'drive_id': drive_id, 'query_id': query_id}
 
         return (xyz0_th,

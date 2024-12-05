@@ -29,7 +29,7 @@ def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 class SimpleViT(nn.Module):
-    def __init__(self, *, image_height, image_width, patch_size, num_classes, dim = 256, depth, heads, mlp_dim, channels = 1, dim_head = 64):
+    def __init__(self, *, image_height, image_width, patch_size, dim = 256, depth, heads, mlp_dim, channels = 1, dim_head = 64):
         super().__init__()
         patch_height, patch_width = pair(patch_size)
         print(patch_size, patch_height, patch_width, image_height, image_width)
@@ -123,7 +123,6 @@ class OverlapTransformerViT_torch(nn.Module):
         self.transformer_encoder = SimpleViT(image_height=height,
                                             image_width=width,
                                             patch_size = 8,
-                                            num_classes = 1000,
                                             dim = 256,
                                             depth = 6,
                                             heads = 16,

@@ -38,15 +38,15 @@ class OverlapTransformer(nn.Module):
 
         self.use_transformer = use_transformer
 
-        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(1,1), bias=False) # [batch, 16, 60, 900]
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=(5,1), stride=(2,1), bias=False) # [batch, 16, 60, 900]
         self.conv2 = nn.Conv2d(16, 32, kernel_size=(3,1), stride=(2,1), bias=False) # [batch, 32, 29, 900]
         self.conv3 = nn.Conv2d(32, 64, kernel_size=(3,1), stride=(2,1), bias=False)
         self.conv4 = nn.Conv2d(64, 64, kernel_size=(3,1), stride=(2,1), bias=False)
         self.conv5 = nn.Conv2d(64, 128, kernel_size=(2,1), stride=(2,1), bias=False)
-        self.conv6 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv7 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv8 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
-        self.conv9 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
+        # self.conv6 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
+        # self.conv7 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
+        # self.conv8 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
+        # self.conv9 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
         self.conv10 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
         self.conv11 = nn.Conv2d(128, 128, kernel_size=(1,1), stride=(2,1), bias=False)
         self.relu = nn.ReLU(inplace=True)
@@ -55,12 +55,12 @@ class OverlapTransformer(nn.Module):
             MHSA
             num_layers=1 is suggested in our work.
         """
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=4, dim_feedforward=1024, activation='relu', batch_first=True, dropout=0.)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=128, nhead=4, dim_feedforward=512, activation='relu', batch_first=True, dropout=0.)
         self.transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.convLast1 = nn.Conv2d(128, 256, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bnLast1 = norm_layer(256)
-        self.convLast2 = nn.Conv2d(512, 1024, kernel_size=(1,1), stride=(1,1), bias=False)
-        self.bnLast2 = norm_layer(1024)
+        self.convLast2 = nn.Conv2d(256, 512, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.bnLast2 = norm_layer(512)
 
         self.linear = nn.Linear(128*900, 256)
 
@@ -71,7 +71,7 @@ class OverlapTransformer(nn.Module):
             NETVLAD
             add_batch_norm=False is needed in our work.
         """
-        self.net_vlad = NetVLADLoupe(feature_size=1024, max_samples=900, cluster_size=64,
+        self.net_vlad = NetVLADLoupe(feature_size=512, max_samples=900, cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
 
@@ -90,17 +90,17 @@ class OverlapTransformer(nn.Module):
         out_l = self.relu(self.conv3(out_l))
         out_l = self.relu(self.conv4(out_l))
         out_l = self.relu(self.conv5(out_l))
-        out_l = self.relu(self.conv6(out_l))
-        out_l = self.relu(self.conv7(out_l))
-        out_l = self.relu(self.conv8(out_l))
-        out_l = self.relu(self.conv9(out_l))
-        if self.x_high >= 32:
-            out_l = self.relu(self.conv10(out_l))
-        if self.x_high >= 64:
-            out_l = self.relu(self.conv11(out_l))
+        # out_l = self.relu(self.conv6(out_l))
+        # out_l = self.relu(self.conv7(out_l))
+        # out_l = self.relu(self.conv8(out_l))
+        # out_l = self.relu(self.conv9(out_l))
+        # if self.x_high >= 32:
+        out_l = self.relu(self.conv10(out_l))
+        # if self.x_high >= 64:
+        out_l = self.relu(self.conv11(out_l))
 
         out_l_1 = out_l.permute(0,1,3,2)
-        out_l_1 = self.relu(self.convLast1(out_l_1))
+        # out_l_1 = self.relu(self.convLast1(out_l_1))
 
         """Using transformer needs to decide whether batch_size first"""
         if self.use_transformer:

@@ -90,6 +90,7 @@ class Evaluator:
         self.args.nclt_dir = '/media/vision/SSD1/Datasets/NCLT'
 
         self.model = get_pipeline(self.args).to(self.device)
+        self.model.load_state_dict(self.checkpoint['model_state_dict'])
         try:
             self.model.load_state_dict(self.checkpoint['model_state_dict'])
         except Exception as e:
@@ -170,17 +171,17 @@ class Evaluator:
         # except:
         #     descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64"
 
-        if os.path.exists(descriptors_file_path+'.npy') and self.test_dataset_forced is None:
-            print(f"* Load preprocessed descriptors from {descriptors_file_path}")
-            descriptors = np.load(descriptors_file_path + '.npy')
-        else: 
-            descriptors = self._make_descriptors()
-            if not os.path.exists("preprocessed_descriptors"):
-                os.makedirs("preprocessed_descriptors")
-            np.save(descriptors_file_path, descriptors)
+        # if os.path.exists(descriptors_file_path+'.npy') and self.test_dataset_forced is None:
+        #     print(f"* Load preprocessed descriptors from {descriptors_file_path}")
+        #     descriptors = np.load(descriptors_file_path + '.npy')
+        # else: 
+        #     descriptors = self._make_descriptors()
+        #     if not os.path.exists("preprocessed_descriptors"):
+        #         os.makedirs("preprocessed_descriptors")
+        #     np.save(descriptors_file_path, descriptors)
 
-        # # must make descriptors test
-        # descriptors = self._make_descriptors()
+        # must make descriptors test
+        descriptors = self._make_descriptors()
 
         descriptor_distances_matrix = squareform(pdist(descriptors, 'euclidean')) #euclidean
         top_matchings = self._find_matching_poses(timestamps, descriptor_distances_matrix, pose_distances_matrix)

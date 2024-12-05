@@ -5,6 +5,8 @@ import numpy as np
 from utils.data_loaders.pointcloud_dataset import *
 from utils.data_utils.utils import *
 
+import cv2
+
 class KittiDepthImageDataset(PointCloudDataset):
     r"""
     Generate single Range Image frame from KITTI odometry dataset. 
@@ -17,9 +19,10 @@ class KittiDepthImageDataset(PointCloudDataset):
                  config=None):
 
         self.root  = config.kitti_dir
+        self.target_channel = config.target_ch
 
         print(config.pipeline)
-        if 'Overlap' in config.pipeline:
+        if 'Overlap' in config.pipeline or 'kpfcnn' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
@@ -69,16 +72,20 @@ class KittiDepthImageDataset(PointCloudDataset):
         step = current_channel // target_channel
         
         ## 입력과 같은 크기의 이미지 반환
-        # 초기화된 0 배열 (검은색 채널로 설정)
-        reduced_range_image = np.zeros_like(range_image)
-        # 선택한 채널만 복사
-        reduced_range_image[::step, :] = range_image[::step, :]
+        # # 초기화된 0 배열 (검은색 채널로 설정)
+        # reduced_range_image = np.zeros_like(range_image)
+        # # 선택한 채널만 복사
+        # reduced_range_image[::step, :] = range_image[::step, :]
 
-        # ## 줄어든 체널에 따라 이미지 크기 조정
-        # # 간격에 따라 채널 선택
-        # reduced_range_image = range_image[::step, :]
-        # # 만약 초과로 선택되었을 경우 초과 채널을 잘라냄
-        # reduced_range_image = reduced_range_image[:target_channel, :]
+        ## 줄어든 체널에 따라 이미지 크기 조정
+        # 간격에 따라 채널 선택
+        reduced_range_image = range_image[::step, :]
+        # 만약 초과로 선택되었을 경우 초과 채널을 잘라냄
+        reduced_range_image = reduced_range_image[:target_channel, :]
+
+        # 원래 이미지 크기로 resize
+        original_shape = range_image.shape
+        reduced_range_image = cv2.resize(reduced_range_image, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_LINEAR)
         
         return reduced_range_image
 
@@ -132,6 +139,9 @@ class KittiDepthImageDataset(PointCloudDataset):
         drive_id, query_id  = self.files[idx]
 
         xyz0_th = self.get_npy_file(drive_id, query_id)
+        if self.target_channel < xyz0_th.shape[0]:
+            xyz0_th = self.reduce_channel(xyz0_th, self.target_channel)
+
         meta_info = {'drive_id': drive_id, 'query_id': query_id}
 
         return (xyz0_th,

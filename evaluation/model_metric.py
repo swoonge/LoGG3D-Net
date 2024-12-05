@@ -42,11 +42,13 @@ def main():
     model.eval()
     n_params = sum([param.nelement() for param in model.parameters()])
 
-    if 'LOGG3D' in cfg.pipeline:
+    if cfg.pipeline == 'LOGG3D':
         cfg.dataset = 'KittiDataset'
     if "Overlap" in cfg.pipeline:
         cfg.dataset = 'KittiDepthImageDataset'
     if "CVT" in cfg.pipeline:
+        cfg.dataset = 'KittiDepthImageDataset'
+    if "kpfcnn" in cfg.pipeline:
         cfg.dataset = 'KittiDepthImageDataset'
     
     loader = make_data_loader(cfg,
@@ -72,7 +74,7 @@ def main():
                 data = batch[0].to(device)
                 processing_timer.tic()
                 output = model(data)
-            elif "Overlap" in cfg.pipeline or "CVT" in cfg.pipeline:
+            elif "Overlap" in cfg.pipeline or "CVT" in cfg.pipeline or "kpfcnn" in cfg.pipeline:
                 data = torch.tensor(batch[0][0])
                 data = data.type(torch.FloatTensor).unsqueeze(0).to(device) if 'CVT' in cfg.pipeline else data.unsqueeze(0).unsqueeze(0).to(device)
                 processing_timer.tic()

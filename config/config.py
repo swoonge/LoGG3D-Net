@@ -13,7 +13,7 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'OverlapGATv2_5')
+pipeline_default = os.getenv('PIPELINE', 'LOGG3D_kpfcnn')
                                         # LOGG3D
                                         # OverlapTransformer
                                         # OverlapNetTransformer
@@ -24,14 +24,16 @@ pipeline_default = os.getenv('PIPELINE', 'OverlapGATv2_5')
                                         # OverlapGATv2_5
                                         # OverlapGATv3
                                         # OverlapViT
+                                        # LOGG3D_kpfcnn
 dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
+                                      # KittirtpCoordinateTupleDataset(LOGG3D_kpfcnn)
                                       # GMPointSparseTupleDataset
                                       # NCLTPointSparseTupleDataset
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGATv2_5_default_kitti00')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGATv22_gm02')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -159,6 +161,7 @@ eval_arg.add_argument("--skip_time", default=30, type=float, help="in seconds")
 eval_arg.add_argument("--cd_thresh_min", default=0.001, type=float, help="Thresholds on cosine-distance to top-1.")
 eval_arg.add_argument("--cd_thresh_max", default=1.0, type=float, help="Thresholds on cosine-distance to top-1.")
 eval_arg.add_argument("--num_thresholds", default=1000, type=int, help="Number of thresholds. Number of points on PR curve.")
+eval_arg.add_argument("--target_ch", default=64, type=int, help="ch")
 
 
 ### Parse ###

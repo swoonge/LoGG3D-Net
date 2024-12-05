@@ -9,9 +9,9 @@ from pipelines.overlap_transformer_resnet import *
 from pipelines.overlap_transformer_ViT import *
 from pipelines.overlap_transformer_geo import *
 from pipelines.cvtnet import CVTNet
-from pipelines.overlap_gat import OverlapGAT, OverlapGATv2, OverlapGATv2_5#, OverlapGATv3
+from pipelines.overlap_gat import OverlapGAT, OverlapGATv2, OverlapGATv22, OverlapGATv2_5, OverlapGATv3
 from pipelines.overlap_vit import OverlapViT
-
+from pipelines.LOGG3D_SPConv import LOGG3D_kpfcnn
 
 def get_pipeline(cfg):
     if cfg.pipeline == 'LOGG3D':
@@ -34,12 +34,16 @@ def get_pipeline(cfg):
         pipeline = OverlapGAT(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapGATv2':
         pipeline = OverlapGATv2(channels=1, use_transformer=True)
+    elif cfg.pipeline == 'OverlapGATv22':
+        pipeline = OverlapGATv22(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapGATv2_5':
         pipeline = OverlapGATv2_5(channels=1, use_transformer=True)
-    # elif cfg.pipeline == 'OverlapGATv3':
-    #     pipeline = OverlapGATv3(channels=1, use_transformer=True)
+    elif cfg.pipeline == 'OverlapGATv3':
+        pipeline = OverlapGATv3(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapViT':
         pipeline = OverlapViT(channels=1)
+    elif cfg.pipeline == 'LOGG3D_kpfcnn':
+        pipeline = LOGG3D_kpfcnn()
     return pipeline
 
 # if __name__ == '__main__':

@@ -16,7 +16,7 @@ import yaml
 from mpl_toolkits.mplot3d import Axes3D
 from utils.data_loaders.make_dataloader import *
 from models.pipelines.pipeline_utils import *
-from utils.data_loaders.kitti.kitti_rangeimage_dataset import load_timestamps
+# from utils.data_loaders.kitti.kitti_depth_image_dataset import load_timestamps
 import pickle
 from tools.utils.matching_plotter import plotter
 
@@ -57,6 +57,7 @@ def __main__(args, model_path_list):
 
         with open(os.path.join(file_path, selected_file), 'rb') as file:
             matching_data = pickle.load(file)['matching_results'] # 이래도 돼?
+        print(matching_data)
         save_file_name = os.path.join(file_path, path[0].split('/')[1] + "_matching_plot.png") ## 저장파일 이름 확정해야 함.
 
         Plotter.data_setting(args, matching_data, save_file_name)
@@ -69,7 +70,7 @@ if __name__ == '__main__':
     model_path_list = [
         # [model_file_name, dataset, seq, [checkpoint_file_name]]
         # ['OverlapTransformer_geo/2024-10-24_16-07-32', 'kitti', 8, []], # kitti08 geo
-        ['OverlapTransformer/2024-10-12_08-41-37', 'gm', 0, []], # triplet lazy False 00
-        
+        # ['OverlapTransformer/2024-10-12_08-41-37', 'gm', 0, []], # triplet lazy False 00
+        ['OverlapGATv2/2024-11-27_13-03-36_OTGATv2_default_kitti00', 'kitti', 0, []], # triplet lazy False 01
     ]
     __main__(args, model_path_list)

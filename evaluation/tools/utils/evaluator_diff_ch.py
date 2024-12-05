@@ -7,18 +7,59 @@ p = os.path.dirname(os.path.dirname((os.path.abspath(__file__))))
 if p not in sys.path:
     sys.path.append(p)
 import numpy as np
-from .utils import load_poses
-from scipy.spatial.distance import pdist, squareform, cdist
-from utils.data_loaders.kitti.kitti_rangeimage_dataset import load_timestamps
+from scipy.spatial.distance import pdist, cdist, squareform
 from utils.data_loaders.make_dataloader import *
 from tools.utils.utils import *
 from models.pipelines.pipeline_utils import *
 from models.pipeline_factory import get_pipeline
 from tqdm import tqdm
 import pandas as pd
-from config.eval_config import *
+from config.config_eval import *
 
 torch.backends.cudnn.benchmark = True
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+def plot_translations(poses):
+    """
+    주어진 포즈 배열에서 변환된 위치(translations)를 추출하고 3D로 시각화합니다.
+
+    Args:
+        poses (list of np.array): 각 pose가 4x4 변환 행렬인 리스트
+    """
+    # 각 pose에서 translation(위치) 부분 추출
+    translations = np.array([pose[:3, 3] for pose in poses])
+
+    # 3D 산점도 그리기
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # x, y, z 좌표 추출
+    x = translations[:, 0]
+    y = translations[:, 1]
+    z = translations[:, 2]
+
+    # 3D 산점도 그리기
+    ax.scatter(x, y, z, marker='o')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('3D Pose Translations')
+
+    # 축 스케일을 동일하게 설정
+    max_range = np.array([x.max()-x.min(), y.max()-y.min(), z.max()-z.min()]).max() / 2.0
+    mid_x = (x.max() + x.min()) * 0.5
+    mid_y = (y.max() + y.min()) * 0.5
+    mid_z = (z.max() + z.min()) * 0.5
+    ax.set_box_aspect([1, 1, 1])  # 동일한 스케일 비율 유지
+    ax.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+    plt.show()
+
 
 def calculate_pose_distances_with_pdist(poses):
     # 각 pose에서 translation 벡터 (x, y, z)를 추출
@@ -30,58 +71,85 @@ def calculate_pose_distances_with_pdist(poses):
     return distances
 
 # @torch.no_grad()
-class Evaluator:
-    def __init__(self, checkpoint_path, thresholds_linspace = [0.0, 1.0, 1000], multi_ch = [64,16]) -> None:
+class Evaluator_diff_ch:
+    def __init__(self, checkpoint_path, test_dataset_forced=None, test_seq_forced=None, test_for_val_set=False, multi_ch=[64, 16]) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.test_dataset_forced = test_dataset_forced
+        self.test_for_val_set = test_for_val_set
         self.checkpoint_path = checkpoint_path
         self.checkpoint = torch.load(checkpoint_path)
         try:
             self.args = self.checkpoint['config']
-        except:
-            self.args = get_config_eval()
-        if not hasattr(self.args, 'skip_time'):
-            self.args.skip_time = 30  # Default value for skip_time
-        self.multi_ch = multi_ch
+        except Exception as e:
+            self.args = get_config()
+        # self.args = get_config() >> for pretrained model
 
-        self.args.kitti_dir = '/media/vision/SSD1/Datasets/kitti/dataset/'
-        self.args.gm_dir = '/media/vision/SSD1/Datasets/gm_datasets/'
+        self.args.kitti_dir = '/media/vision/SSD1/Datasets/kitti/dataset'
+        self.args.gm_dir = '/media/vision/SSD1/Datasets/gm_datasets'
+        self.args.mulran_dir = '/media/vision/SSD1/Datasets/MulRan'
+        self.args.nclt_dir = '/media/vision/SSD1/Datasets/NCLT'
 
         self.model = get_pipeline(self.args).to(self.device)
+        self.model.load_state_dict(self.checkpoint['model_state_dict'])
         try:
             self.model.load_state_dict(self.checkpoint['model_state_dict'])
-        except:
+        except Exception as e:
             self.model.load_state_dict(self.checkpoint['state_dict'])
+        
         self.model.eval()
+
+        if self.test_dataset_forced is not None:
+            self.args.dataset = self.test_dataset_forced
 
         if 'Kitti' in self.args.dataset :
             self.pose_threshold = [3.0, 20.0]
-            self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
+            if self.test_for_val_set:
+                self.args.kitti_data_split['test'] = self.args.kitti_data_split['val']
             # self.sequence = f"{int(checkpoint_path.split('.')[-2][-1]):02d}" # for Logg3D pretrained
             # self.args.kitti_data_split['test'] = [int(checkpoint_path.split('.')[-2][-1])] # for Logg3D pretrained
-            self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
-            self.dataset_path = os.path.join(self.args.kitti_dir, 'sequences', self.sequence)
-            if self.args.dataset == 'KittiRangeImageTupleDataset': self.args.dataset = 'KittiRangeImageDataset' 
-            if self.args.dataset == 'KittiCVTTupleDataset': self.args.dataset = 'KittiCVTDataset' 
+            # self.args.kitti_eval_seq = int(checkpoint_path.split('.')[-2][-1]) # for trained
+            # self.args.kitti_eval_seq = 0 # for pretrained model
+            if test_seq_forced is not None:
+                self.args.kitti_data_split['test'][0] = test_seq_forced
+            self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+                self.args.dataset = 'KittiDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'KittiSparseTupleDataset'
         elif 'GM' in self.args.dataset:
             self.pose_threshold = [1.5, 10.0]
+            if self.test_for_val_set:
+                self.args.gm_data_split['test'] = self.args.gm_data_split['val']
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
-            self.dataset_path = os.path.join(self.args.gm_dir, self.sequence)
-            self.args.dataset = GMRangeImageDataset
-
-
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+                self.args.dataset = 'GMDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'GMSparseTupleDataset'
+        elif 'NCLT' in self.args.dataset:
+            self.pose_threshold = [3.0, 20.0]
+            if self.test_for_val_set:
+                self.args.nclt_data_split['test'][0] = "2012-01-15" if self.args.nclt_data_split['test'][0] == self.args.nclt_data_split['val'][0] else self.args.nclt_data_split['val'][0]
+            self.sequence = self.args.nclt_data_split['test'][0]
+            if test_seq_forced is not None:
+                self.args.nclt_data_split['test'][0] = test_seq_forced
+                self.sequence = self.args.nclt_data_split['test'][0]
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+                self.args.dataset = 'NCLTDepthImageDataset'
+            elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
+                self.args.dataset = 'NCLTSparseTupleDataset'
         
-        self.thresholds = np.linspace(thresholds_linspace[0], thresholds_linspace[1], thresholds_linspace[2])#[300:600]
+        self.thresholds = np.linspace(self.args.cd_thresh_min, self.args.cd_thresh_max, self.args.num_thresholds)#[300:600]
         self.thresholds_num = len(self.thresholds)
         self.descriptors = []
 
-        self.args.target_channel = multi_ch[0]
+        self.args.target_ch = multi_ch[0]
         self.data_loader_base = make_data_loader(self.args,
                             self.args.test_phase, # 'test'
                             self.args.batch_size, # 
                             num_workers=self.args.train_num_workers,
                             shuffle=False)
-
-        self.args.target_channel = multi_ch[1]
+        
+        self.args.target_ch = multi_ch[1]
         self.data_loader_query = make_data_loader(self.args,
                             self.args.test_phase, # 'test'
                             self.args.batch_size, # 
@@ -99,27 +167,32 @@ class Evaluator:
         print('*' * 50)
         print('* evaluator run ...')
         # print("* processing for gt matching ...")
-        timestamps = np.array(load_timestamps(self.dataset_path + '/times.txt'))
-        poses = load_poses(os.path.join(self.dataset_path, 'poses.txt'))
+        timestamps = self.data_loader_base.dataset.timestamps_dict[self.sequence]
+        poses = self.data_loader_base.dataset.poses_dict[self.sequence]
+        
+        # translations = np.array([pose[:3, 3] for pose in poses])
+        # plot_translations(poses)
+
         pose_distances_matrix = calculate_pose_distances_with_pdist(poses)
+        # try:
+        # descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] +"_"+ str(self.data_loader.dataset.drive_ids[0])
+        # except:
+        #     descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + "_64"
 
-        descriptors_file_path_database = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + f'_{self.multi_ch[0]}'+ ".npz"
-        if os.path.exists(descriptors_file_path_database):
-            print('* load descriptors at ', descriptors_file_path_database)
-            descriptors_database = np.load(descriptors_file_path_database)["descriptors"]
-        else: 
-            descriptors_database = self._make_descriptors(self.data_loader_base)
-            np.savez_compressed(descriptors_file_path_database, descriptors=descriptors_database)
+        # if os.path.exists(descriptors_file_path+'.npy') and self.test_dataset_forced is None:
+        #     print(f"* Load preprocessed descriptors from {descriptors_file_path}")
+        #     descriptors = np.load(descriptors_file_path + '.npy')
+        # else: 
+        #     descriptors = self._make_descriptors()
+        #     if not os.path.exists("preprocessed_descriptors"):
+        #         os.makedirs("preprocessed_descriptors")
+        #     np.save(descriptors_file_path, descriptors)
 
-        descriptors_file_path_query = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + f'_{self.multi_ch[1]}'+ ".npz"
-        if os.path.exists(descriptors_file_path_query):
-            print('* load descriptors at ', descriptors_file_path_query)
-            descriptors_query = np.load(descriptors_file_path_query)["descriptors"]
-        else: 
-            descriptors_query = self._make_descriptors(self.data_loader_query)
-            np.savez_compressed(descriptors_file_path_query, descriptors=descriptors_query)
+        # must make descriptors test
+        descriptors_base = self._make_descriptors(self.data_loader_base)
+        descriptors_query = self._make_descriptors(self.data_loader_query)
 
-        descriptor_distances_matrix = cdist(descriptors_database, descriptors_query, metric='cosine')
+        descriptor_distances_matrix = cdist(descriptors_base, descriptors_query, 'euclidean') #euclidean
         top_matchings = self._find_matching_poses(timestamps, descriptor_distances_matrix, pose_distances_matrix)
         
         metrics_list = self._calculate_metrics(top_matchings)
@@ -127,7 +200,7 @@ class Evaluator:
 
 
     @torch.no_grad()
-    def _make_descriptors(self, data_loader):
+    def _make_descriptors(self, data_loader=None):
         descriptors_list = []
         test_loader_progress_bar = tqdm(data_loader, desc="* Make global descriptors", leave=True)
         for i, batch in enumerate(test_loader_progress_bar, 0):
@@ -142,21 +215,28 @@ class Evaluator:
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
-            elif self.args.pipeline.split('_')[0] == 'OverlapTransformer':
+            elif 'Overlap' in self.args.pipeline.split('_')[0]:
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
-                input_t = input_t.unsqueeze(0).unsqueeze(0).type(torch.FloatTensor).to(device=self.device)
+                if input_t.ndim == 3:
+                    input_t = input_t.unsqueeze(0)[:, 0, :, :].unsqueeze(1)
+                else:
+                    input_t = input_t.unsqueeze(0).unsqueeze(0)
+
                 output_desc = self.model(input_t)
                 global_descriptor = output_desc.cpu().detach().numpy()
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
+            elif 'CVT' in self.args.pipeline:
+                input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
+                input_t = input_t.unsqueeze(0)
+                output_desc = self.model(input_t)
+                global_descriptor = output_desc.cpu().detach().numpy()
+                global_descriptor = np.reshape(global_descriptor, (1, -1))
+                descriptors_list.append(global_descriptor[0])
+                
         return np.array(descriptors_list)
-    
-    def make_and_save_descriptors(self, ch):
-        descriptors = self._make_descriptors()
-        descriptors_file_path = "preprocessed_descriptors/" + self.checkpoint_path.split('/')[-2] + '_' + self.checkpoint_path.split('/')[-1].split('.')[0] + f'_{ch}'+ ".npz"
-        np.savez_compressed(descriptors_file_path, descriptors=descriptors)
-
+        
     def _find_matching_poses(self, timestamps, descriptor_distances_matrix, pose_distances_matrix):
         start_time = timestamps[0]
         self.revist = [0 for _ in range(pose_distances_matrix.shape[0])]
@@ -248,12 +328,13 @@ class Evaluator:
         max_f1_score_idx = df["F1-Score"].idxmax()
         corresponding_threshold = df["Thresholds"][max_f1_score_idx]
         corresponding_recall = df["Recall (TPR)"][max_f1_score_idx]
+        corresponding_accuracy = df["Accuracy"][max_f1_score_idx]
         F1_TN = df["True Negatives"][max_f1_score_idx]
         F1_FN = df["False Negatives"][max_f1_score_idx]
         F1_FP = df["False Positives"][max_f1_score_idx]
         F1_TP = df["True Positives"][max_f1_score_idx]
-        print(f"* Best F1-Score:\t {max_f1_score:.3f}, \tRecall: {corresponding_recall:.3f}, \tat thresholds: {corresponding_threshold:.3f}")
+        print(f"* Best F1-Score:\t {max_f1_score:.3f}, \tRecall: {corresponding_recall:.3f}, \tAcc: {corresponding_accuracy:.3f},\tat thresholds: {corresponding_threshold:.3f}")
         print(f"* num_revist: {sum(self.revist)}")
         print(f"* TP: {F1_TP}, TN: {F1_TN}, FP: {F1_FP}, FN: {F1_FN}")
         # print(f"* Best F1-Score:\t {max_f1_score}, at that metrics:\n*\t", df[df["F1-Score"] == max_f1_score])
-        return max_f1_score_idx
+        return max_f1_score_idx, [max_f1_score, corresponding_recall, corresponding_accuracy, corresponding_threshold]
