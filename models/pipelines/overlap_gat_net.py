@@ -11,11 +11,12 @@ import torch.nn as nn
 from aggregators.netvlad import NetVLADLoupe
 import torch.nn.functional as F
 from backbones.GAT.gatv2_conv import GATv2Conv
+from torch_geometric.data import Data, Batch
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from sklearn.decomposition import PCA
 
 class PatchEmbedding(nn.Module):
     """Divide image into patches and embed them."""
@@ -41,53 +42,6 @@ class PatchEmbedding(nn.Module):
         patches = x.flatten(2).transpose(1, 2)  # [batch, num_patches, embed_dim]
         return patches
     
-class CNNPatchEmbedding(nn.Module):
-    """Patch Embedding using 3-layer CNN."""
-    def __init__(self, in_channels=1, embed_dim=128):
-        """
-        Args:
-            in_channels (int): Number of input channels.
-            embed_dim (int): Final embedding dimension.
-        """
-        super(CNNPatchEmbedding, self).__init__()
-        self.cnn_layers = nn.Sequential(
-            # First CNN Layer: 1 -> 23
-            nn.Conv2d(in_channels, 23, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(23),
-            nn.ReLU(),
-
-            # Second CNN Layer: 23 -> 64
-            nn.Conv2d(23, 64, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-
-            ## if embed_dim == 128:
-            # Third CNN Layer: 64 -> 128
-            nn.Conv2d(64, embed_dim, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(embed_dim),
-            nn.ReLU()
-
-            ## if embed_dim == 256:
-            # nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d(embed_dim),
-            # nn.ReLU(),
-
-            # nn.Conv2d(128, embed_dim, kernel_size=3, stride=1, padding=1),
-            # nn.BatchNorm2d(embed_dim),
-            # nn.ReLU()
-        )
-
-    def forward(self, x):
-        """
-        Args:
-            x: Input tensor of shape [batch, in_channels, H, W].
-        Returns:
-            Feature tensor of shape [batch, 1, 1, embed_dim].
-        """
-        # Pass through CNN layers
-        x = self.cnn_layers(x)  # Output shape: [batch, embed_dim, H', W']
-        return x
-
 
 class TransformerEncoder(nn.Module):
     """Transformer Encoder block."""
@@ -160,19 +114,93 @@ class VisionTransformer(nn.Module):
         x = x.permute(1, 0, 2)  # [batch, num_patches, embed_dim]
         return x
     
+
+class CNNPatchEmbedding(nn.Module):
+    """Patch Embedding using CNN with adjustable depth."""
+    def __init__(self, in_channels=1, embed_dim=128, base_channels=32, depth=3, patch_size=(8, 8)):
+        """
+        Args:
+            in_channels (int): Number of input channels.
+            embed_dim (int): Final embedding dimension.
+            base_channels (int): Initial number of channels.
+            depth (int): Number of CNN layers.
+            patch_size (tuple): Size of the patch (height, width).
+        """
+        super(CNNPatchEmbedding, self).__init__()
+
+        self.cnn_layers = nn.ModuleList()
+        current_channels = in_channels
+        stride = patch_size[0] // 2
+
+        # First layer with kernel size 5
+        self.cnn_layers.append(
+            self._conv_block(current_channels, base_channels, kernel_size=5, stride=stride)
+        )
+        current_channels = base_channels
+
+        # Dynamically add remaining layers with kernel size 3
+        for i in range(1, depth - 1):
+            out_channels = base_channels * (2 ** i)
+            self.cnn_layers.append(
+                self._conv_block(current_channels, out_channels, kernel_size=3, stride=stride)
+            )
+            current_channels = out_channels
+
+        # Final layer to match embed_dim with kernel size 3
+        self.cnn_layers.append(
+            self._conv_block(current_channels, embed_dim, kernel_size=3, stride=1)
+        )
+
+    def _conv_block(self, in_channels, out_channels, kernel_size, stride):
+        """Helper function to create a CNN block."""
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=kernel_size // 2),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        """
+        Args:
+            x: Input tensor of shape [batch, in_channels, H, W].
+        Returns:
+            Feature tensor of shape [batch, embed_dim, H', W'].
+        """
+        for layer in self.cnn_layers:
+            print(x.size())
+            x = layer(x)
+        print(x.size())  
+        return x
+
+    
+
 class PatchCNNVisionTransformer(nn.Module):
     """Vision Transformer for non-square images."""
-    def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=512):
+    def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, 
+                 depth=4, num_heads=4, ff_dim=512, dropout=0.1):
         super(PatchCNNVisionTransformer, self).__init__()
-        self.patch_embed = CNNPatchEmbedding(in_channels, patch_size, embed_dim)
-        self.pos_embedding = nn.Parameter(torch.zeros(1, 896, embed_dim))  # Positional embeddings
-        self.dropout = nn.Dropout(0.1)
+        self.patch_embed = CNNPatchEmbedding(in_channels=in_channels, 
+                                             embed_dim=embed_dim, 
+                                             base_channels=32, 
+                                             depth=4, 
+                                             patch_size=patch_size)
+        self.embed_dim = embed_dim
+        self.depth = depth
+        self.dropout = nn.Dropout(dropout)
 
         # Transformer Encoder layers
         self.transformer = nn.ModuleList([
             TransformerEncoder(embed_dim, num_heads, ff_dim) for _ in range(depth)
         ])
         self.norm = nn.LayerNorm(embed_dim)
+        
+        # Positional embedding (initialized later dynamically)
+        self.pos_embedding = None
+
+    def _init_pos_embedding(self, num_patches):
+        if self.pos_embedding is None or self.pos_embedding.size(1) != num_patches:
+            self.pos_embedding = nn.Parameter(torch.zeros(1, num_patches, self.embed_dim))
+            nn.init.trunc_normal_(self.pos_embedding, std=0.02)  # Standard initialization
 
     def forward(self, x):
         """
@@ -181,11 +209,14 @@ class PatchCNNVisionTransformer(nn.Module):
         Returns:
             feature_map: Feature tensor of shape [batch, num_patches, embed_dim].
         """
-        batch_size, _, H, W = x.size()
         patches = self.patch_embed(x)  # [batch, num_patches, embed_dim]
+        batch_size, num_patches, _ = patches.size()
+
+        # Initialize positional embeddings dynamically
+        self._init_pos_embedding(num_patches)
 
         # Add positional embeddings
-        x = patches + self.pos_embedding[:, :patches.size(1), :]
+        x = patches + self.pos_embedding[:, :num_patches, :]
         x = self.dropout(x)
 
         # Transformer Encoder
@@ -199,36 +230,34 @@ class PatchCNNVisionTransformer(nn.Module):
 
 class PyramidCNN(nn.Module):
     """Feature extraction with adjusted patch dimensions based on input aspect ratio."""
-    def __init__(self, in_channels=1):
+    def __init__(self, in_channels=1, norm_layer="gn", output_shape=(16, 250),
+                 channels=[32, 64, 128], kernel_sizes=[5, 3, 3], strides=[1, 2, 2]):
         super(PyramidCNN, self).__init__()
 
-        # Conv layer 1
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=5, stride=1, padding=2, bias=False)
-        self.gn1 = nn.GroupNorm(4, 32)
+        self.norm_layer = norm_layer
 
-        self.conv1_1 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.gn1_1 = nn.GroupNorm(4, 32)
-
-        # Conv layer 2 with stride
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=2, bias=False)
-        self.gn2 = nn.GroupNorm(8, 64)
-
-        # Increase kernel size to 5x5 for better feature extraction
-        self.conv2_1 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.gn2_1 = nn.GroupNorm(8, 64)
-
-        # Conv layer 3 with stride
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2, bias=False)
-        self.gn3 = nn.GroupNorm(16, 128)
-
-        # Increase kernel size to 5x5 for global context learning
-        self.conv3_1 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False)
-        self.gn3_1 = nn.GroupNorm(16, 128)
+        # Build convolutional blocks dynamically
+        self.conv_blocks = self._make_layers(in_channels, channels, kernel_sizes, strides)
 
         # Adaptive pooling to reduce dimensions while preserving aspect ratio
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 112))  # Target size based on aspect ratio
-
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(output_shape)  # Target size based on aspect ratio
         self.relu = nn.ReLU(inplace=True)
+
+    def _make_layers(self, in_channels, channels, kernel_sizes, strides):
+        layers = []
+        for i in range(len(channels)):
+            layers.append(nn.Conv2d(in_channels, channels[i], kernel_size=kernel_sizes[i], 
+                                    stride=strides[i], padding=kernel_sizes[i] // 2, bias=False,
+                                    padding_mode='circular'))
+            layers.append(self._get_norm_layer(channels[i], 4 * (2 ** i)))  # Dynamic group size
+            in_channels = channels[i]
+        return nn.Sequential(*layers)
+
+    def _get_norm_layer(self, num_channels, num_groups):
+        if self.norm_layer == "gn":
+            return nn.GroupNorm(num_groups, num_channels)
+        else:
+            return nn.BatchNorm2d(num_channels)
 
     def forward(self, x):
         """
@@ -237,146 +266,213 @@ class PyramidCNN(nn.Module):
         Returns:
             patch_features: Features of shape [batch, num_patches, feature_dim].
         """
-        # Conv block 1
-        x = self.relu(self.gn1(self.conv1(x)))  # [batch, 32, H, W]
-        x = self.relu(self.gn1_1(self.conv1_1(x)))  # [batch, 32, H, W]
+        # Apply convolutional blocks
+        x = self.conv_blocks(x)
 
-        # Conv block 2
-        x = self.relu(self.gn2(self.conv2(x)))  # [batch, 64, H/2, W/2]
-        x = self.relu(self.gn2_1(self.conv2_1(x)))  # [batch, 64, H/2, W/2]
-
-        # Conv block 3
-        x = self.relu(self.gn3(self.conv3(x)))  # [batch, 128, H/4, W/4]
-        x = self.relu(self.gn3_1(self.conv3_1(x)))  # [batch, 128, H/4, W/4]
-
-        # print("x size: ", x.size())
         # Adaptive pooling to match target patch count and aspect ratio
-        x = self.adaptive_pool(x)  # [batch, 128, 8, 112]
+        x = self.adaptive_pool(x)  # [batch, 128, 16, 250]
+        return x
+   
 
-        # Reshape into patch-wise features
-        batch_size, channels, height, width = x.size()  # [batch, 896, 128]
-        # print("batch_size, channels, height, width: ", batch_size, channels, height, width)
-        patch_features = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [batch, num_patches, feature_dim]
+class GraphNetwork(nn.Module):
+    def __init__(self, gat_channels):
+        super(GraphNetwork, self).__init__()
+        self.num_layers = len(gat_channels)
+        self.gat_layers = nn.ModuleList()
 
-        return patch_features
+        for layer in range(self.num_layers - 1):
+            self.gat_layers.append(GATv2Conv(gat_channels[layer], gat_channels[layer + 1], residual=True, dropout=0.1))
 
+    def forward(self, x, edge_index):
+        for gat in self.gat_layers:
+            x =  F.relu((gat(x, edge_index)))
+        return x
 
 
 class OverlapGATNet(nn.Module):
-    def __init__(self, top_k_list=[500, 300], patch_radius=9, in_channels=1):
+    def __init__(self, config, in_channels=1):
         super(OverlapGATNet, self).__init__()
-        self.pyramid_cnn = PyramidCNN(in_channels)
-        # self.pyramid_resnet_cnn = PatchCNNVisionTransformer(in_channels)
-        # self.vit = VisionTransformer(in_channels, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=256)
-        # self.decoder = nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.gat_conv1 = GATv2Conv(128, 256, residual=True, dropout=0.1)
-        self.gat_conv2 = GATv2Conv(256, 256, residual=True, dropout=0.1)
-        # self.gat_conv3 = GATv2Conv(256, 256, residual=True, dropout=0.1)
-        self.net_vlad = NetVLADLoupe(feature_size=256, max_samples=top_k_list[1], cluster_size=64,
+        self.top_k_list = config.topk_list
+        self.patch_radius = config.patch_radius
+        self.config = config
+
+        if config.feature_extractor_backbone == "CNN":
+            self.feature_extractor = PyramidCNN(in_channels, config.cnn_norm_layer, config.cnn_output_shape,
+                                        config.cnn_channels, config.cnn_kernel_sizes, config.cnn_strides)
+        elif config.feature_extractor_backbone == "PatchCNNViT":
+            self.feature_extractor = PatchCNNVisionTransformer(in_channels, patch_size=config.PatchCNNViT_patch_size, 
+                                                               embed_dim=config.PatchCNNViT_embed_dim, depth=4, num_heads=4, 
+                                                               ff_dim=256, dropout=0.1)
+
+        self.gat_layers = GraphNetwork(config.gat_channels)
+        self.net_vlad = NetVLADLoupe(feature_size=config.gat_channels[-1], max_samples=self.top_k_list[1], cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
-        self.top_k_list = top_k_list
-        self.patch_radius = patch_radius
 
     def create_edges(self, topk_indices, patch_radius, height, width):
-        """
-        Args:
-            topk_indices: Tensor of shape [batch, top_k] containing the indices of selected queries.
-            patch_radius: Radius within which to connect patches.
-            height: Number of patches along the height of the grid.
-            width: Number of patches along the width of the grid.
-        Returns:
-            edge_index: Tensor of shape [2, edge_num] containing edge connections.
-        """
-        batch_size, top_k = topk_indices.size()
-        edge_list = []
-
-        # Precompute grid coordinates
+        if topk_indices.dim() == 1:
+            topk_indices = topk_indices.unsqueeze(0)  # [1, top_k]
+        
+        # Top-K 인덱스를 2D 좌표로 변환
         y_coords = topk_indices // width  # [batch, top_k]
         x_coords = topk_indices % width   # [batch, top_k]
 
-        # Create relative index ranges for neighbors
-        rel_indices = torch.arange(-patch_radius, patch_radius + 1, device=topk_indices.device)
-        rel_y, rel_x = torch.meshgrid(rel_indices, rel_indices, indexing='ij')  # [2*radius+1, 2*radius+1]
-        rel_y = rel_y.flatten()
-        rel_x = rel_x.flatten()
+        # Top-K 패치 좌표 [batch, top_k, 2]
+        coords = torch.stack((y_coords, x_coords), dim=2).float()
 
-        for b in range(batch_size):
-            # Get coordinates for current batch
-            y = y_coords[b]  # [top_k]
-            x = x_coords[b]  # [top_k]
+        # 패치 간 거리 계산 (유클리드 거리)
+        distances = torch.cdist(coords, coords, p=2)  # [batch, top_k, top_k]
 
-            # Broadcast coordinates for all neighbors
-            y_neighbors = y[:, None] + rel_y[None, :]  # [top_k, num_neighbors]
-            x_neighbors = x[:, None] + rel_x[None, :]  # [top_k, num_neighbors]
+        # 거리 내에 있는 패치 (patch_radius 이하)
+        within_radius = distances <= patch_radius  # [batch, top_k, top_k]
 
-            # Mask out-of-bound neighbors
-            valid_mask = (y_neighbors >= 0) & (y_neighbors < height) & (x_neighbors >= 0) & (x_neighbors < width)
-            valid_y_neighbors = y_neighbors[valid_mask]  # Flatten valid y neighbors
-            valid_x_neighbors = x_neighbors[valid_mask]  # Flatten valid x neighbors
+        # 자기 자신 엣지 제거 (거리가 0인 경우)
+        no_self_loop = torch.eye(topk_indices.size(1), device=topk_indices.device).bool()
+        within_radius &= ~no_self_loop.unsqueeze(0)  # [batch, top_k, top_k]
 
-            # Convert valid neighbors back to 1D indices
-            neighbors = valid_y_neighbors * width + valid_x_neighbors  # [num_valid_neighbors]
-            src = topk_indices[b].repeat_interleave(rel_y.numel())[valid_mask.flatten()]  # Match neighbors' shape
-            dst = neighbors  # [num_valid_neighbors]
+        # 엣지 인덱스 생성
+        src = topk_indices.repeat_interleave(topk_indices.size(1))  # [batch, top_k * top_k]
+        dst = topk_indices.repeat(1, topk_indices.size(1)).flatten()  # [batch, top_k * top_k]
 
-            # Add edges (src, dst)
-            edges = torch.stack((src, dst), dim=0)  # [2, num_edges]
-            edge_list.append(edges)
+        # 유효한 엣지만 필터링 (자기 자신 제외)
+        valid_edges = within_radius.flatten()
+        src = src[valid_edges]
+        dst = dst[valid_edges]
 
-        # Combine all batch edges
-        # edge_index = torch.stack(edge_list, dim=0)  # [2, total_edges]
-        return edge_list
+        # [2, num_edges] 형태로 반환
+        return torch.stack((src, dst), dim=0)
+
+    def visualize_edges(self, topk_indices, edge_index, height, width, patch_h, patch_w, feature):
+        plt.figure(figsize=(10, 10))
+        all_coords = torch.arange(patch_h * patch_w).numpy()
+        all_y = (all_coords // width)
+        all_x = (all_coords % width)
+        plt.scatter(all_x, all_y, color='gray', label='All Nodes')
+
+        # print("topk_indices", topk_indices, " | edge_index", edge_index.size())
+        y_coords = (topk_indices // width).cpu().numpy()
+        x_coords = (topk_indices % width).cpu().numpy()
+        plt.scatter(x_coords, y_coords, color='blue', label='Top-K Nodes')
+
+        for i in range(edge_index.size(1)):
+            src = edge_index[0, i].item()
+            dst = edge_index[1, i].item()
+            src_y, src_x = src // width, src % width
+            dst_y, dst_x = dst // width, dst % width
+            plt.plot([src_x, dst_x], [src_y, dst_y], color='green', alpha=0.5)
+        
+        plt.gca().invert_yaxis()
+        plt.legend()
+        plt.title('Visualization of Edges and Top-K Nodes')
+        plt.show()
 
     def forward(self, x):
-        import time
         # Patch-wise feature extraction
-        # tt = time.time()
-        patch_features = self.pyramid_cnn(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0002 sec
-        # patch_features = self.pyramid_resnet_cnn(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0004 sec
-        # patch_features = self.vit(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0007 sec
-        # print("patch_features size: ", patch_features.size())
-        # print("pyramid_cnn time: ", time.time()-tt)
+        patch_features = self.feature_extractor(x)  # [batch, feature_dim, h, w] >> [batch, 128, 16, 225]
+        # Reshape into patch-wise features
+        batch_size, channels, _, _ = patch_features.size() 
+        patch_features = patch_features.view(batch_size, channels, -1).permute(0, 2, 1)  # [batch, num_patches, feature_dim]
+        # print("patch_features", patch_features.size())
 
         # Top-K patch selection
-        # tt = time.time()
-        patch_scores_1 = torch.norm(patch_features, dim=2)  # [batch, num_patches]
-        topk_indices_1 = torch.topk(patch_scores_1, self.top_k_list[0], dim=1).indices  # [batch, top_k] >> [13, 300]
-        # print("topk time: ", time.time()-tt)
+        patch_scores_1 = torch.norm(patch_features, dim=2)  # [batch, num_patches] >> [6, 3600]
+        topk_indices_1 = torch.topk(patch_scores_1, self.top_k_list[0], dim=1).indices  # [batch, top_k] >> [6, 1000]
+        # print("patch_scores_1", patch_scores_1.size(), " | topk_indices_1", topk_indices_1.size())
 
         # Create edges for GAT
-        batch_size, _, _ = patch_features.size()
-        patch_h = patch_w = 8
-        height = x.size(2) // patch_h # >> 8
-        width = x.size(3) // patch_w # >> 112
+        patch_h, patch_w = self.config.cnn_output_shape  # >> 16, 225
+        height = x.size(2) // patch_h # >> 4
+        width = x.size(3) // patch_w # >> 4
+        # print("patch_h", patch_h, " | patch_w", patch_w, " | batch_size", batch_size)
+        # print("height", height, " | width", width)
 
-        # GAT processing
         out_list = []
-        # tt = time.time()
-        edge_index = [edge.to(patch_features.device) for edge in self.create_edges(topk_indices_1, self.patch_radius, height, width)] # [batch, 2, n]
-        # print("create_edges time: ", time.time()-tt)
-        # tt = time.time()
+        edge_index_list = [
+            self.create_edges(topk_indices_1[i], self.patch_radius, height, width).to(patch_features.device)
+            for i in range(batch_size)
+        ]
+        # print("edge_index", edge_index[0].size())
+        self.visualize_edges(topk_indices_1[0], edge_index_list[0], height, width, patch_h, patch_w, patch_features[0])
+
+        # GAT layer
         for i in range(batch_size):
-            node_features = patch_features[i]  # [num_queries, feature_dim] >> [700, 128]
-            node_features = F.relu(self.gat_conv1(node_features, edge_index[i]))
-            node_features = F.relu(self.gat_conv2(node_features, edge_index[i]))[topk_indices_1[i]]
-            # node_features = F.relu(self.gat_conv3(node_features, edge_index[i]))[topk_indices_1[i]]
-            out_list.append(node_features)
-        gat_output = torch.stack(out_list, dim=0)  # [batch_size, topk, feature_dim]
+            node_features = self.gat_layers(patch_features[i], edge_index_list[i])  # [num_queries, feature_dim] >> [700, 128]
+            out_list.append(node_features[topk_indices_1[i]])
+        gat_output = torch.stack(out_list, dim=0)  # [batch_size, topk, feature_dim] >> [6, 1000, 256]
+        # print("gat_output", gat_output.size()) 
 
         patch_scores_2 = torch.norm(gat_output, dim=2)  # [batch, num_patches]
         topk_indices_2 = torch.topk(patch_scores_2, self.top_k_list[1], dim=1).indices  # [batch, top_k] >> [13, 300]
+        # print("patch_scores_2", patch_scores_2.size(), " | topk_indices_2", topk_indices_2.size())
         
         gat_output = gat_output[torch.arange(batch_size)[:, None], topk_indices_2]
-        gat_output = gat_output.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim, topk, 1]
-        # print("gat_output size: ", gat_output.size())
-        # print("gat time: ", time.time()-tt)
+        gat_output = F.normalize(gat_output.permute(0, 2, 1).unsqueeze(3), dim=1) # [batch, feature_dim, topk, 1] >> [6, 256, 500, 1]
+        # print("gat_output", gat_output.size())
 
         # Reshape GAT output for NetVLAD
-        # tt = time.time()
-        gat_output = F.normalize(gat_output, dim=1)
-        vlad_output = self.net_vlad(gat_output)
-        # print("netvlad time: ", time.time()-tt)
+        vlad_output = self.net_vlad(gat_output) # >> [6, 256]
+        # print("vlad_output", vlad_output.size())
 
         return F.normalize(vlad_output, dim=1)
 
+sys.path.append(os.path.join(os.path.dirname(os.path.join(os.path.dirname(os.path.join(os.path.dirname(__file__)))))))
+from config.config import get_config
+from utils.data_loaders.make_dataloader import make_data_loader
+from time import time
+import numpy as np
+from matplotlib import pyplot as plt
+import networkx as nx
+
+def shift_image(image, shift):
+    """Shift image along width direction."""
+    return torch.roll(image, shifts=shift, dims=3)
+
+def visualize_feature_maps(feature_map1, feature_map2):
+    """Visualize feature maps."""
+    fig, axes = plt.subplots(2, 1, figsize=(10, 5))
+    axes[0].imshow(feature_map1.cpu().detach().numpy(), cmap='viridis')
+    axes[0].set_title('Feature Map 1')
+    axes[1].imshow(feature_map2.cpu().detach().numpy(), cmap='viridis')
+    axes[1].set_title('Feature Map 2')
+    plt.show()
+
+def test_overlap_gat_net():
+    cfg = get_config()
+    model = OverlapGATNet(cfg).to("cuda")
+    train_loader = make_data_loader(cfg,
+                                    cfg.train_phase,
+                                    cfg.batch_size,
+                                    num_workers=cfg.train_num_workers,
+                                    shuffle=True)
+    batch = next(iter(train_loader)).unsqueeze(1).to("cuda")
+    tt = time()
+    output = model(batch)
+    print("Inference Time:", time() - tt)
+    print("Output Shape:", output.shape)
+
+def test_pyramid_cnn():
+    import matplotlib.pyplot as plt
+
+    cfg = get_config()
+    train_loader = make_data_loader(cfg,
+                                    cfg.train_phase,
+                                    cfg.batch_size,
+                                    num_workers=cfg.train_num_workers,
+                                    shuffle=True)
+    single_image = next(iter(train_loader)).unsqueeze(1).to("cuda")[0:1]
+    shifted_image = shift_image(single_image, shift=300)
+    batch = torch.cat([single_image, shifted_image], dim=0)
+    print("Batch Shape:", batch.size())
+
+    pyramid_cnn = PyramidCNN(in_channels=1, norm_layer="gn", output_shape=(16, 250),
+                             channels=[32, 64, 128], kernel_sizes=[5, 3, 3], strides=[1, 2, 2]).to("cuda")
+    feature_maps = pyramid_cnn(batch)
+    print("Feature Maps Shape:", feature_maps.size())
+    reversed_shifted_feature_map = shift_image(feature_maps[1:2], shift=-300)
+    visualize_feature_maps(feature_maps[0, 0], reversed_shifted_feature_map[0, 0])
+    difference = torch.abs(feature_maps[0] - reversed_shifted_feature_map)
+    print("Difference between feature maps:", difference.mean().item())
+
+if __name__ == "__main__":
+    test_overlap_gat_net()
+    # test_pyramid_cnn()

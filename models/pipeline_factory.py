@@ -30,20 +30,10 @@ def get_pipeline(cfg):
         pipeline = OverlapTransformer_geo(channels=1, use_transformer=True)
     elif cfg.pipeline == 'CVTNet':
         pipeline = CVTNet(channels=5, use_transformer=True)
-    elif cfg.pipeline == 'OverlapGAT':
-        pipeline = OverlapGAT(channels=1, use_transformer=True)
-    elif cfg.pipeline == 'OverlapGATv2':
-        pipeline = OverlapGATv2(channels=1, use_transformer=True)
-    elif cfg.pipeline == 'OverlapGATv22':
-        pipeline = OverlapGATv22(channels=1, use_transformer=True)
-    elif cfg.pipeline == 'OverlapGATv2_5':
-        pipeline = OverlapGATv2_5(channels=1, use_transformer=True)
-    elif cfg.pipeline == 'OverlapGATv3':
-        pipeline = OverlapGATv3(channels=1, use_transformer=True)
     elif cfg.pipeline == 'OverlapViT':
         pipeline = OverlapViT(channels=1)
     elif cfg.pipeline == 'OverlapGATNet':
-        pipeline = OverlapGATNet()
+        pipeline = OverlapGATNet(config=cfg)
     return pipeline
 
 # if __name__ == '__main__':

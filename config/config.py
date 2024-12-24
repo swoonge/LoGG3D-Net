@@ -45,6 +45,24 @@ trainer_arg.add_argument('--batch_size', type=int, default=1) # Batch size is li
 trainer_arg.add_argument('--train_num_workers', type=int, default=8)  # per gpu in dist. try 8
 trainer_arg.add_argument('--server', type=bool, default=False)  # per gpu in dist. try 8
 
+### Model setting ###
+# OverlapGATNet
+overlap_gat_net_arg = add_argument_group('OverlapGATNet')
+overlap_gat_net_arg.add_argument('--feature_extractor_backbone', type=str, default='CNN') # CNN, DACNN, ViT, PatchCNNViT
+overlap_gat_net_arg.add_argument('--cnn_channels', type=list, default=[32, 64, 128, 128]) # 256, 512
+overlap_gat_net_arg.add_argument('--cnn_kernel_sizes', type=list, default=[5, 3, 3, 3]) # 3, 5
+overlap_gat_net_arg.add_argument('--cnn_strides', type=list, default=[(1,2), 2, 2, 1]) # 2, 1
+overlap_gat_net_arg.add_argument('--cnn_norm_layer', type=str, default='gn') # gn, bn
+overlap_gat_net_arg.add_argument('--cnn_output_shape', type=tuple, default=(16, 113)) # (16, 225) (8, 112)
+overlap_gat_net_arg.add_argument('--PatchCNNViT_patch_size', type=tuple, default=(4, 4))
+overlap_gat_net_arg.add_argument('--PatchCNNViT_embed_dim', type=int, default=128) # 2, 3, 4
+overlap_gat_net_arg.add_argument('--gat_channels', type=int, default=[128, 256]) # 256, 512
+overlap_gat_net_arg.add_argument('--topk_list', type=list, default=[1000, 500]) # [2000, 1000] [600, 300]
+overlap_gat_net_arg.add_argument('--patch_radius', type=int, default=7) # 7, 9
+
+# DRaGNet
+drag_net_arg = add_argument_group('DRaGNet')
+
 ### Loss Function ###
 loss_arg = add_argument_group('Loss')
 # Contrastive
