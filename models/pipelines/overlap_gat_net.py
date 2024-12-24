@@ -392,7 +392,7 @@ class OverlapGATNet(nn.Module):
             for i in range(batch_size)
         ]
         # print("edge_index", edge_index[0].size())
-        self.visualize_edges(topk_indices_1[0], edge_index_list[0], height, width, patch_h, patch_w, patch_features[0])
+        # self.visualize_edges(topk_indices_1[0], edge_index_list[0], height, width, patch_h, patch_w, patch_features[0])
 
         # GAT layer
         for i in range(batch_size):
