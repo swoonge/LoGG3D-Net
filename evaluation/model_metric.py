@@ -43,7 +43,7 @@ def main():
     n_params = sum([param.nelement() for param in model.parameters()])
 
     if cfg.pipeline == 'LOGG3D':
-        cfg.dataset = 'KittiDataset'
+        cfg.dataset = 'GMDataset'
     if "Overlap" in cfg.pipeline:
         cfg.dataset = 'KittiDepthImageDataset'
     if "CVT" in cfg.pipeline:
@@ -75,13 +75,13 @@ def main():
                 processing_timer.tic()
                 output = model(data)
             elif "Overlap" in cfg.pipeline or "CVT" in cfg.pipeline or "kpfcnn" in cfg.pipeline:
-                data = torch.tensor(batch[0][0])
+                data = torch.tensor(batch[0][0])      
                 data = data.type(torch.FloatTensor).unsqueeze(0).to(device) if 'CVT' in cfg.pipeline else data.unsqueeze(0).unsqueeze(0).to(device)
                 processing_timer.tic()
                 output = model(data) if 'GAT' in cfg.pipeline else model(data)
             processing_timer.toc()
-        times_np = np.array(model.times)
-        print("average time: ", np.mean(times_np))
+        # times_np = np.array(model.times)
+        # print("average time: ", np.mean(times_np))
         
         logger.info('[Model info]')
         logger.info('    Training pipeline: ' + cfg.pipeline)

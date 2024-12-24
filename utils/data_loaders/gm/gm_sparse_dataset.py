@@ -30,6 +30,17 @@ class GMSparseTupleDataset(GMTupleDataset):
         self.num_points = config.num_points
         self.phase = phase
 
+        self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
+        for drive_id in self.drive_ids:
+            files = load_kitti_files(self.root, drive_id, is_sorted=True)
+            id_file_dict = {} 
+            for query_id, file in enumerate(files):
+                self.files.append((drive_id, query_id))
+                id_file_dict[query_id] = file
+            self.id_file_dicts[drive_id] = id_file_dict
+            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
+            self.timestamps_dict[drive_id] = load_kitti_timestamps(self.root, drive_id)
+
     def get_pointcloud_sparse_tensor(self, drive_id, pc_id):
         fname = self.get_velodyne_fn(drive_id, self.id_file_dicts[drive_id][pc_id])
         xyzr = np.fromfile(fname, dtype=np.float32).reshape(-1, 4)
@@ -131,6 +142,7 @@ class GMPointSparseTupleDataset(GMSparseTupleDataset):
         self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]  # 드라이브 ID 리스트 생성
         for drive_id in self.drive_ids:
             self.poses_dict[drive_id] = load_gm_poses(self.root, drive_id)
+            
 
     def get_delta_pose(self, transforms):
         w_T_p1 = transforms[0]

@@ -19,9 +19,11 @@ class KittiDepthImageDataset(PointCloudDataset):
                  config=None):
 
         self.root  = config.kitti_dir
-        self.target_channel = config.target_ch
+        if hasattr(config, 'target_ch'):
+            self.target_channel = config.target_ch
+        else:
+            self.target_channel = 64
 
-        print(config.pipeline)
         if 'Overlap' in config.pipeline or 'kpfcnn' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
@@ -140,7 +142,19 @@ class KittiDepthImageDataset(PointCloudDataset):
 
         xyz0_th = self.get_npy_file(drive_id, query_id)
         if self.target_channel < xyz0_th.shape[0]:
+            # original_xyz0_th = xyz0_th.copy()
             xyz0_th = self.reduce_channel(xyz0_th, self.target_channel)
+
+            # # Display original and reduced channel images for comparison
+            # import matplotlib.pyplot as plt
+            # plt.figure(figsize=(12, 6))
+            # plt.subplot(1, 2, 1)
+            # plt.imshow(original_xyz0_th, cmap='gray')
+            # plt.title("Original Image")
+            # plt.subplot(1, 2, 2)
+            # plt.imshow(xyz0_th, cmap='gray')
+            # plt.title("Reduced Channel Image")
+            # plt.show()
 
         meta_info = {'drive_id': drive_id, 'query_id': query_id}
 

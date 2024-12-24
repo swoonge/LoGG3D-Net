@@ -33,7 +33,7 @@ dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'OTGATNet_test')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'LOGG3D_gm03')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -48,11 +48,11 @@ trainer_arg.add_argument('--server', type=bool, default=False)  # per gpu in dis
 ### Loss Function ###
 loss_arg = add_argument_group('Loss')
 # Contrastive
-loss_arg.add_argument('--train_loss_function', type=str, default='triplet') # quadruplet, triplet
+loss_arg.add_argument('--train_loss_function', type=str, default='quadruplet') # quadruplet, triplet
 loss_arg.add_argument('--lazy_loss', type=str2bool, default=True)
 loss_arg.add_argument('--ignore_zero_loss', type=str2bool, default=False)
-loss_arg.add_argument('--positives_per_query', type=int, default=6) # 2
-loss_arg.add_argument('--negatives_per_query', type=int, default=6) # 2-18
+loss_arg.add_argument('--positives_per_query', type=int, default=2) # 2
+loss_arg.add_argument('--negatives_per_query', type=int, default=2) # 2-18
 loss_arg.add_argument('--loss_margin_1', type=float, default=0.5) # 0.5
 loss_arg.add_argument('--loss_margin_2', type=float, default=0.3) # 0.3
 
@@ -67,10 +67,10 @@ loss_arg.add_argument('--scene_loss_weight', type=float, default=1.0) # 0.1
 ### Optimizer arguments ###
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
-opt_arg.add_argument('--max_epoch', type=int, default=50)  # 20
+opt_arg.add_argument('--max_epoch', type=int, default=60)  # 20
 opt_arg.add_argument('--base_learning_rate', type=float, default=5e-5) # LoGG3D: 1e-3, OT: 5e-6, GAT: 5e-5
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
-opt_arg.add_argument('--scheduler', type=str, default='ReduceLROnPlateau') 
+opt_arg.add_argument('--scheduler', type=str, default='step2') 
                                                     #cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
 
 ### Dataset specific configurations ###
@@ -90,7 +90,7 @@ data_arg.add_argument('--kitti_seq_lens', type=dict, default=
                         {   "0": 4541, "1": 1101, "2": 4661, "3": 801, "4": 271, "5": 2761,
                             "6": 1101, "7": 1101, "8": 4071, "9": 1591, "10": 1201})
 data_arg.add_argument('--kitti_data_split', type=dict, default=
-                        {'train': [3, 4, 5, 6, 7, 8, 9, 10], 'val': [2], 'test': [0]})
+                        {'train': [0, 3, 4, 5, 6, 7, 9, 10], 'val': [2], 'test': [8]})
 
 # MulRan Dataset
 data_arg.add_argument('--mulran_dir', type=str, default='/media/vision/SSD1/Datasets/MulRan', help="Path to the MulRan dataset")
@@ -116,7 +116,7 @@ data_arg.add_argument("--gm_normalize_intensity", type=str2bool, default=False, 
 data_arg.add_argument('--gm_3m_json', type=str, default='positive_sequence_D-2_T-0.json')
 data_arg.add_argument('--gm_20m_json', type=str, default='positive_sequence_D-10_T-0.json')
 data_arg.add_argument('--gm_seq_lens', type=dict, default={"0": 4150, "1": 6283, "2": 5340,"3": 5410})
-data_arg.add_argument('--gm_data_split', type=dict, default={'train': [0, 1, 3], 'val': [2], 'test': [2]})
+data_arg.add_argument('--gm_data_split', type=dict, default={'train': [0, 1, 2], 'val': [3], 'test': [3]})
 
 # NCLT Dataset
 data_arg.add_argument('--nclt_dir', type=str, default='/media/vision/SSD1/Datasets/NCLT', help="Path to the gm dataset")

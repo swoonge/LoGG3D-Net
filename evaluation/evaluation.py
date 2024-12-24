@@ -26,7 +26,7 @@ def __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=
 
         if test_all:
             check_points = [f for f in os.listdir(os.path.join('../checkpoints', model_path)) if f.endswith('.pth')]
-            check_points = sorted(check_points, key=lambda x: int(re.search(r'\d+', x).group()))[25:]
+            check_points = sorted(check_points, key=lambda x: int(re.search(r'\d+', x).group()))[10:]
         else:
             check_points = test_models[1]
 
@@ -60,6 +60,15 @@ def __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=
 
 if __name__ == '__main__':
     test_models_list = [
+        # # LOGG3D
+        # ['LoGG3D/kitti_10cm_loo', ['3n24h_Kitti_v10_q29_10s0.pth']],
+        # ['LOGG3D/2024-11-22_11-00-00_LOGG3D_default_kitti05', ['epoch_30.pth']],
+        # ['LoGG3D/kitti_10cm_loo', ['3n24h_Kitti_v10_q29_10s8.pth']],
+        ['LOGG3D/2024-12-19_18-00-54_LOGG3D_gm02', ['epoch_30.pth', 'epoch_best_41.pth']],
+        ['LOGG3D/2024-12-19_18-02-15_LOGG3D_gm03', ['epoch_30.pth', 'epoch_best_41.pth']],
+        # ['LOGG3D/2024-11-25_11-00-00_LOGG3D_default_nclt', ['epoch_best_42.pth']],
+        # ['LOGG3D/2024-11-25_11-00-00_LOGG3D_default_nclt', ['epoch_best_42.pth']],
+
         # # OverlapTransformer
         # ['OverlapTransformer/2024-11-22_19-16-43_OT_default_kitti00',['epoch_best_36.pth']],
         # ['OverlapTransformer/2024-11-22_19-23-31_OT_default_kitti05',['epoch_30.pth', 'epoch_best_40.pth']],
@@ -70,7 +79,7 @@ if __name__ == '__main__':
         # ['OverlapTransformer/2024-11-25_11-52-28_OT_default_nclt', ['epoch_47.pth']],
         # ['OverlapTransformer/original', ['pretrained_overlap_transformer.pth.tar']],
         # ['OverlapTransformer/2024-12-04_11-41-56_OT_topk_reduceDim_kitti00', ['epoch_46.pth']],
-        # ['OverlapTransformer/2024-12-04_15-59-48_OT_reduceDim_kitti00', ['epoch_38.pth'],
+        # ['OverlapTransformer/2024-12-04_15-59-48_OT_reduceDim_kitti00', ['epoch_38.pth']],
 
         # # OverlapNetTransformer
         # ['OverlapNetTransformer/2024-11-22_11-33-49_OLT_default_kitti00', ['epoch_30.pth']],
@@ -94,12 +103,24 @@ if __name__ == '__main__':
         # ['OverlapGAT/2024-11-25_13-23-14_OTGAT_default_kitti00test', ['epoch_46.pth']],
 
         # OverlapGATv2
-        ['OverlapGATv2/2024-11-27_13-03-36_OTGATv2_default_kitti00', ['epoch_best_13.pth']], # 이제 x
-        # ['OverlapGATv2/2024-11-29_11-13-27_OTGATv2_default_kitti08', ['epoch_best_29.pth']], # 이제 x
+        # ['OverlapGATv2/2024-11-27_13-03-36_OTGATv2_default_kitti00', ['epoch_best_13.pth']],
+        # ['OverlapGATv2/2024-11-29_11-13-27_OTGATv2_default_kitti08', ['epoch_best_29.pth']],
         # ['OverlapGATv2_5/2024-12-02_20-11-27_OTGATv2_5_default_kitti00', ['epoch_49.pth', 'epoch_41.pth', 'epoch_best_39.pth']],
         # ['OverlapGATv3/2024-12-03_21-35-45_OverlapGATv3_default_kitti00', ['epoch_35.pth']],
 
+        # OverlapGATNet_cnn
+        # ['OverlapGATNet/2024-12-05_17-31-57_OTGATNet_cnn_kitti00', ['epoch_best_23.pth']],
+        # ['OverlapGATNet/2024-12-06_15-35-00_OTGATNet_cnn_kitti08', ['epoch_best_46.pth']],
+        # ['OverlapGATNet/2024-12-07_17-15-46_OTGATNet_cnn_gm02', ['epoch_best_33.pth']],
+        
+        # ['OverlapGATNet/2024-12-13_10-49-52_OTGATNet_cnn_gm02', ['epoch_best_22.pth', 'epoch_best_25.pth', 'epoch_best_36.pth', 'epoch_57.pth']], # 22, 25가 best
+        # ['OverlapGATNet/2024-12-13_10-49-31_OTGATNet_cnn_gm03', ['epoch_37.pth']],
+        # ['OverlapGATNet/2024-12-13_10-50-08_OTGATNet_cnn_nclt', ['epoch_59.pth', 'epoch_best_102.pth']],
+        # ['OverlapGATNet/2024-12-09_21-42-47_OTGATNet_cnn_kitti00', ['epoch_best_37.pth']],
+        # ['OverlapGATNet/2024-12-09_21-43-03_OTGATNet_cnn_kitti05', ['epoch_46.pth']],
+        # ['OverlapGATNet/2024-12-09_21-43-19_OTGATNet_cnn_kitti08', ['epoch_29.pth']],
     ]
-    # __main__(test_models_list, test_all=True, test_for_val_set=True)
+
+    __main__(test_models_list, test_all=True, test_for_val_set=True)
     # __main__(test_models_list, test_all=False, test_for_val_set=False)
-    __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=[64, 16])
+    # __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=[64, 16])

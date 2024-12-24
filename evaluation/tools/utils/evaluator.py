@@ -115,7 +115,7 @@ class Evaluator:
             if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
                 self.args.dataset = 'KittiDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
-                self.args.dataset = 'KittiSparseTupleDataset'
+                self.args.dataset = 'KittiDataset'
         elif 'GM' in self.args.dataset:
             self.pose_threshold = [1.5, 10.0]
             if self.test_for_val_set:
@@ -124,7 +124,7 @@ class Evaluator:
             if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
                 self.args.dataset = 'GMDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
-                self.args.dataset = 'GMSparseTupleDataset'
+                self.args.dataset = 'GMDataset'
         elif 'NCLT' in self.args.dataset:
             self.pose_threshold = [3.0, 20.0]
             if self.test_for_val_set:
@@ -198,8 +198,7 @@ class Evaluator:
             if i >= len(test_loader_progress_bar):
                 break
             if self.args.pipeline == 'LOGG3D':
-                lidar_pc = batch[0][0]
-                input_st = make_sparse_tensor(lidar_pc, self.args.voxel_size).to(device=self.device)
+                input_st = make_sparse_tensor(batch[0][0], self.args.voxel_size).to(device=self.device)
                 output_desc, output_feats = self.model(input_st)
                 output_feats = output_feats[0]
                 global_descriptor = output_desc.cpu().detach().numpy()

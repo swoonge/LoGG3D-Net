@@ -63,9 +63,11 @@ def main():
 
     if cfg.resume_checkpoint:
         resume_filename = cfg.resume_checkpoint
-        logger.info("Resuming Model From ", os.path.join(model_save_path, resume_filename))
-        checkpoint = torch.load(os.path.join(model_save_path, resume_filename))
-        starting_epoch = checkpoint['epoch']
+        # logger.info("Resuming Model From ", os.path.join(resume_filename))
+        model_save_path = os.path.dirname(resume_filename)
+        writer = SummaryWriter(log_dir=model_save_path)
+        checkpoint = torch.load(os.path.join(resume_filename))
+        starting_epoch = checkpoint['epoch'] + 1
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     else:
@@ -88,7 +90,7 @@ def main():
      
     best_val_loss = 1000000
 
-    for epoch in range(starting_epoch, cfg.max_epoch):
+    for epoch in range(starting_epoch, cfg.max_epoch + starting_epoch):
         
         lr = optimizer.param_groups[0]['lr']
         logger.info('**** EPOCH %03d ****' % (epoch) + ' LR: %06f' % (lr))

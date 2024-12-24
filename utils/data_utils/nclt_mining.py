@@ -4,6 +4,7 @@ from tqdm import tqdm
 import open3d as o3d
 from scipy.spatial.distance import pdist, squareform
 import argparse
+import matplotlib.pyplot as plt
 
 from utils import *
 
@@ -166,12 +167,15 @@ class NCLT_processor:
 
             fnames = self.fnames[drive_id]
 
-            for fname in tqdm(fnames, desc="* Processing Point Clouds at Drive {}".format(drive_id)):
+            for fname in tqdm(fnames[15000:], desc="* Processing Point Clouds at Drive {}".format(drive_id)):
                 ri_np = self.get_ri_np(drive_id, fname)
                 file_name = fname.split('.')[0]
                 output_fname = os.path.join(output_dir, f'{file_name}.npy')
                 np.save(output_fname, ri_np)
+                output_png_fname = os.path.join(output_dir, f'{file_name}.png')
+                plt.imsave(output_png_fname, ri_np, cmap='gray')
                 tqdm.write(f'* Saved: {output_fname}')
+                exit()
                 
         self.logger.info('Finished generating RI images')
         print('*' * 100)

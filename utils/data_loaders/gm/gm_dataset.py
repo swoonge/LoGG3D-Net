@@ -27,6 +27,8 @@ class GMDataset(PointCloudDataset):
             self.logger.info("Dataloader initialized with Ground Plane removal.")
 
         self.id_file_dicts = {}
+        self.poses_dict = {}
+        self.timestamps_dict = {}
         self.files = []
 
         self.drive_ids = [str(drive_id).zfill(2) if isinstance(drive_id, int) else drive_id for drive_id in config.gm_data_split[phase]]
@@ -37,6 +39,8 @@ class GMDataset(PointCloudDataset):
                 self.files.append((drive_id, query_id))
                 id_file_dict[query_id] = file
             self.id_file_dicts[drive_id] = id_file_dict
+            self.poses_dict[drive_id] = load_kitti_poses(self.root, drive_id)
+            self.timestamps_dict[drive_id] = load_kitti_timestamps(self.root, drive_id)
 
     def get_velodyne_fn(self, drive, file):
         fname = os.path.join(self.root, 'sequences', drive, 'velodyne', file)

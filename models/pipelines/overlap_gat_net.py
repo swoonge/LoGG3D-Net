@@ -40,6 +40,53 @@ class PatchEmbedding(nn.Module):
         x = self.proj(x)  # [batch, embed_dim, H/patch_h, W/patch_w]
         patches = x.flatten(2).transpose(1, 2)  # [batch, num_patches, embed_dim]
         return patches
+    
+class CNNPatchEmbedding(nn.Module):
+    """Patch Embedding using 3-layer CNN."""
+    def __init__(self, in_channels=1, embed_dim=128):
+        """
+        Args:
+            in_channels (int): Number of input channels.
+            embed_dim (int): Final embedding dimension.
+        """
+        super(CNNPatchEmbedding, self).__init__()
+        self.cnn_layers = nn.Sequential(
+            # First CNN Layer: 1 -> 23
+            nn.Conv2d(in_channels, 23, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(23),
+            nn.ReLU(),
+
+            # Second CNN Layer: 23 -> 64
+            nn.Conv2d(23, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+
+            ## if embed_dim == 128:
+            # Third CNN Layer: 64 -> 128
+            nn.Conv2d(64, embed_dim, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(embed_dim),
+            nn.ReLU()
+
+            ## if embed_dim == 256:
+            # nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            # nn.BatchNorm2d(embed_dim),
+            # nn.ReLU(),
+
+            # nn.Conv2d(128, embed_dim, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(embed_dim),
+            # nn.ReLU()
+        )
+
+    def forward(self, x):
+        """
+        Args:
+            x: Input tensor of shape [batch, in_channels, H, W].
+        Returns:
+            Feature tensor of shape [batch, 1, 1, embed_dim].
+        """
+        # Pass through CNN layers
+        x = self.cnn_layers(x)  # Output shape: [batch, embed_dim, H', W']
+        return x
 
 
 class TransformerEncoder(nn.Module):
@@ -77,25 +124,19 @@ class TransformerEncoder(nn.Module):
 
         return x
 
-
 class VisionTransformer(nn.Module):
     """Vision Transformer for non-square images."""
-    def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=256, num_classes=None):
+    def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=512):
         super(VisionTransformer, self).__init__()
         self.patch_embed = PatchEmbedding(in_channels, patch_size, embed_dim)
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))  # Classification token
-        self.pos_embedding = nn.Parameter(torch.zeros(1, 1000, embed_dim))  # Positional embeddings
+        self.pos_embedding = nn.Parameter(torch.zeros(1, 896, embed_dim))  # Positional embeddings
         self.dropout = nn.Dropout(0.1)
 
         # Transformer Encoder layers
         self.transformer = nn.ModuleList([
             TransformerEncoder(embed_dim, num_heads, ff_dim) for _ in range(depth)
         ])
-
         self.norm = nn.LayerNorm(embed_dim)
-        self.num_classes = num_classes
-        if num_classes is not None:
-            self.head = nn.Linear(embed_dim, num_classes)
 
     def forward(self, x):
         """
@@ -107,155 +148,53 @@ class VisionTransformer(nn.Module):
         batch_size, _, H, W = x.size()
         patches = self.patch_embed(x)  # [batch, num_patches, embed_dim]
 
-        # Add classification token
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)  # [batch, 1, embed_dim]
-        x = torch.cat((cls_tokens, patches), dim=1)  # [batch, 1 + num_patches, embed_dim]
-
         # Add positional embeddings
-        x = x + self.pos_embedding[:, :x.size(1), :]
+        x = patches + self.pos_embedding[:, :patches.size(1), :]
         x = self.dropout(x)
 
         # Transformer Encoder
-        x = x.permute(1, 0, 2)  # [1 + num_patches, batch, embed_dim]
+        x = x.permute(1, 0, 2)  # [num_patches, batch, embed_dim]
         for layer in self.transformer:
             x = layer(x)
 
-        x = x.permute(1, 0, 2)  # [batch, 1 + num_patches, embed_dim]
-
-        # Classification head (optional)
-        if self.num_classes is not None:
-            x = self.head(x[:, 0])  # Use the CLS token for classification
-
-        return x[:, 1:]  # Exclude CLS token and return patch features
-
-
-
-class ResidualBlock(nn.Module):
-    """Residual Block with two convolutional layers."""
-    def __init__(self, channels):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(channels)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        identity = x  # Residual connection
-        out = self.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += identity
-        return self.relu(out)
-
-
-class PyramidPatchCNN(nn.Module):
-    """Feature extraction with increased channels and Residual Blocks."""
-    def __init__(self, in_channels=1, patch_size=(8, 8)):
-        super(PyramidPatchCNN, self).__init__()
-        self.patch_size = patch_size
-
-        # First convolution to increase feature dimensions
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
-
-        # Residual Blocks with increasing channels
-        self.res_block1 = ResidualBlock(32)
-        self.res_block2 = ResidualBlock(64)
-        self.res_block3 = ResidualBlock(128)
-
-        # Downsample layers to increase spatial abstraction
-        self.downsample1 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False)
-        self.bn_down1 = nn.BatchNorm2d(64)
-        self.downsample2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)
-        self.bn_down2 = nn.BatchNorm2d(128)
-
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        """
-        Args:
-            x: Input image of shape [batch, 1, 64, 900].
-        Returns:
-            patch_features: Patch-wise features of shape [batch, num_patches, feature_dim].
-        """
-        batch_size, _, height, width = x.size()
-        patch_h, patch_w = self.patch_size
-
-        # Divide image into patches
-        patches = x.unfold(2, patch_h, patch_h).unfold(3, patch_w, patch_w)
-        patches = patches.contiguous().view(batch_size, 1, -1, patch_h, patch_w)  # [batch, 1, num_patches, 8, 8]
-
-        patch_features = []
-        for patch_idx in range(patches.size(2)):
-            patch = patches[:, :, patch_idx, :, :]  # [batch, 1, 8, 8] -> valid for Conv2d
-
-            # Pass through convolutional and residual layers
-            patch = self.relu(self.bn1(self.conv1(patch)))  # [batch, 32, 8, 8]
-            patch = self.res_block1(patch)                 # Residual Block 1
-            patch = self.relu(self.bn_down1(self.downsample1(patch)))  # Downsample to [batch, 64, 4, 4]
-            patch = self.res_block2(patch)                 # Residual Block 2
-            patch = self.relu(self.bn_down2(self.downsample2(patch)))  # Downsample to [batch, 128, 2, 2]
-            patch = self.res_block3(patch)                 # Residual Block 3
-
-            # Adaptive pooling to reduce dimensions
-            patch = F.adaptive_avg_pool2d(patch, (1, 1)).squeeze(-1).squeeze(-1)  # [batch, 128]
-            patch_features.append(patch)
-
-        patch_features = torch.stack(patch_features, dim=1)  # [batch, num_patches, feature_dim(128)]
-        return patch_features
+        x = x.permute(1, 0, 2)  # [batch, num_patches, embed_dim]
+        return x
     
+class PatchCNNVisionTransformer(nn.Module):
+    """Vision Transformer for non-square images."""
+    def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=512):
+        super(PatchCNNVisionTransformer, self).__init__()
+        self.patch_embed = CNNPatchEmbedding(in_channels, patch_size, embed_dim)
+        self.pos_embedding = nn.Parameter(torch.zeros(1, 896, embed_dim))  # Positional embeddings
+        self.dropout = nn.Dropout(0.1)
 
-class PyramidResnetCNN(nn.Module):
-    """Feature extraction with reduced patch count (~900 patches)."""
-    def __init__(self, in_channels=1):
-        super(PyramidResnetCNN, self).__init__()
-
-        # Feature extraction layers with strides and pooling to reduce patch count
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.GroupNorm(32)
-        self.res_block1 = ResidualBlock(32)
-
-        # Downsample using stride and pooling
-        self.downsample1 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False)  # Reduce spatial size by half
-        self.bn_down1 = nn.GroupNorm(64)
-        self.res_block2 = ResidualBlock(64)
-
-        self.downsample2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)  # Reduce spatial size by half
-        self.bn_down2 = nn.GroupNorm(128)
-        self.res_block3 = ResidualBlock(128)
-
-        # Pooling to further reduce spatial dimensions while preserving information
-        self.pool = nn.AdaptiveAvgPool2d((30, 30))  # Final spatial resolution to match ~900 patches
-
-        self.relu = nn.ReLU(inplace=True)
+        # Transformer Encoder layers
+        self.transformer = nn.ModuleList([
+            TransformerEncoder(embed_dim, num_heads, ff_dim) for _ in range(depth)
+        ])
+        self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
         """
         Args:
-            x: Input image of shape [batch, 1, H, W].
+            x: Input image of shape [batch, in_channels, H, W].
         Returns:
-            patch_features: Features of shape [batch, num_patches, feature_dim].
+            feature_map: Feature tensor of shape [batch, num_patches, embed_dim].
         """
-        # First convolution layer
-        x = self.relu(self.bn1(self.conv1(x)))  # [batch, 32, H, W]
-        x = self.res_block1(x)
+        batch_size, _, H, W = x.size()
+        patches = self.patch_embed(x)  # [batch, num_patches, embed_dim]
 
-        # Downsample step 1
-        x = self.relu(self.bn_down1(self.downsample1(x)))  # [batch, 64, H/2, W/2]
-        x = self.res_block2(x)
+        # Add positional embeddings
+        x = patches + self.pos_embedding[:, :patches.size(1), :]
+        x = self.dropout(x)
 
-        # Downsample step 2
-        x = self.relu(self.bn_down2(self.downsample2(x)))  # [batch, 128, H/4, W/4]
-        x = self.res_block3(x)
+        # Transformer Encoder
+        x = x.permute(1, 0, 2)  # [num_patches, batch, embed_dim]
+        for layer in self.transformer:
+            x = layer(x)
 
-        # Adaptive pooling to reduce spatial dimensions further
-        x = self.pool(x)  # [batch, 128, 30, 30]
-
-        # Flatten to patch-wise features
-        batch_size, channels, height, width = x.size()
-        patch_features = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [batch, num_patches(900), feature_dim(128)]
-
-        return patch_features
+        x = x.permute(1, 0, 2)  # [batch, num_patches, embed_dim]
+        return x
 
 
 class PyramidCNN(nn.Module):
@@ -264,16 +203,27 @@ class PyramidCNN(nn.Module):
         super(PyramidCNN, self).__init__()
 
         # Conv layer 1
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.gn1 = nn.GroupNorm(4, 32)  # GroupNorm for stability
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=5, stride=1, padding=2, bias=False)
+        self.gn1 = nn.GroupNorm(4, 32)
+
+        self.conv1_1 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False)
+        self.gn1_1 = nn.GroupNorm(4, 32)
 
         # Conv layer 2 with stride
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=2, bias=False)
         self.gn2 = nn.GroupNorm(8, 64)
 
+        # Increase kernel size to 5x5 for better feature extraction
+        self.conv2_1 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.gn2_1 = nn.GroupNorm(8, 64)
+
         # Conv layer 3 with stride
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2, bias=False)
         self.gn3 = nn.GroupNorm(16, 128)
+
+        # Increase kernel size to 5x5 for global context learning
+        self.conv3_1 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False)
+        self.gn3_1 = nn.GroupNorm(16, 128)
 
         # Adaptive pooling to reduce dimensions while preserving aspect ratio
         self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 112))  # Target size based on aspect ratio
@@ -289,18 +239,23 @@ class PyramidCNN(nn.Module):
         """
         # Conv block 1
         x = self.relu(self.gn1(self.conv1(x)))  # [batch, 32, H, W]
+        x = self.relu(self.gn1_1(self.conv1_1(x)))  # [batch, 32, H, W]
 
         # Conv block 2
         x = self.relu(self.gn2(self.conv2(x)))  # [batch, 64, H/2, W/2]
+        x = self.relu(self.gn2_1(self.conv2_1(x)))  # [batch, 64, H/2, W/2]
 
         # Conv block 3
         x = self.relu(self.gn3(self.conv3(x)))  # [batch, 128, H/4, W/4]
+        x = self.relu(self.gn3_1(self.conv3_1(x)))  # [batch, 128, H/4, W/4]
 
+        # print("x size: ", x.size())
         # Adaptive pooling to match target patch count and aspect ratio
         x = self.adaptive_pool(x)  # [batch, 128, 8, 112]
 
         # Reshape into patch-wise features
-        batch_size, channels, height, width = x.size()  # [batch, 128, 8, 112]
+        batch_size, channels, height, width = x.size()  # [batch, 896, 128]
+        # print("batch_size, channels, height, width: ", batch_size, channels, height, width)
         patch_features = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [batch, num_patches, feature_dim]
 
         return patch_features
@@ -308,21 +263,20 @@ class PyramidCNN(nn.Module):
 
 
 class OverlapGATNet(nn.Module):
-    def __init__(self, top_k=300, patch_radius=5, in_channels=1):
+    def __init__(self, top_k_list=[500, 300], patch_radius=9, in_channels=1):
         super(OverlapGATNet, self).__init__()
         self.pyramid_cnn = PyramidCNN(in_channels)
-        self.pyramid_resnet_cnn = PyramidResnetCNN(in_channels)
-        self.vit = VisionTransformer(in_channels, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=256)
-        self.decoder = nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.gat_conv1 = GATv2Conv(128, 128, residual=True, dropout=0.1)
-        self.gat_conv2 = GATv2Conv(128, 256, residual=True, dropout=0.1)
-        self.net_vlad = NetVLADLoupe(feature_size=256, max_samples=top_k, cluster_size=64,
+        # self.pyramid_resnet_cnn = PatchCNNVisionTransformer(in_channels)
+        # self.vit = VisionTransformer(in_channels, patch_size=(8, 8), embed_dim=128, depth=4, num_heads=4, ff_dim=256)
+        # self.decoder = nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.gat_conv1 = GATv2Conv(128, 256, residual=True, dropout=0.1)
+        self.gat_conv2 = GATv2Conv(256, 256, residual=True, dropout=0.1)
+        # self.gat_conv3 = GATv2Conv(256, 256, residual=True, dropout=0.1)
+        self.net_vlad = NetVLADLoupe(feature_size=256, max_samples=top_k_list[1], cluster_size=64,
                                      output_dim=256, gating=True, add_batch_norm=False,
                                      is_training=True)
-        self.top_k = top_k
+        self.top_k_list = top_k_list
         self.patch_radius = patch_radius
-
-        self.times = []
 
     def create_edges(self, topk_indices, patch_radius, height, width):
         """
@@ -377,43 +331,49 @@ class OverlapGATNet(nn.Module):
     def forward(self, x):
         import time
         # Patch-wise feature extraction
-        tt = time.time()
+        # tt = time.time()
         patch_features = self.pyramid_cnn(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0002 sec
         # patch_features = self.pyramid_resnet_cnn(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0004 sec
         # patch_features = self.vit(x)  # [batch, num_patches, feature_dim] >> [13, 896, 128] # 0.0007 sec
         # print("patch_features size: ", patch_features.size())
         # print("pyramid_cnn time: ", time.time()-tt)
-        self.times.append(time.time()-tt)
 
         # Top-K patch selection
-        tt = time.time()
-        patch_scores = torch.norm(patch_features, dim=2)  # [batch, num_patches]
-        topk_indices = torch.topk(patch_scores, self.top_k, dim=1).indices  # [batch, top_k] >> [13, 300]
+        # tt = time.time()
+        patch_scores_1 = torch.norm(patch_features, dim=2)  # [batch, num_patches]
+        topk_indices_1 = torch.topk(patch_scores_1, self.top_k_list[0], dim=1).indices  # [batch, top_k] >> [13, 300]
         # print("topk time: ", time.time()-tt)
 
         # Create edges for GAT
-        batch_size, num_patches, feature_dim = patch_features.size()
+        batch_size, _, _ = patch_features.size()
         patch_h = patch_w = 8
         height = x.size(2) // patch_h # >> 8
         width = x.size(3) // patch_w # >> 112
 
         # GAT processing
         out_list = []
-        tt = time.time()
-        edge_index = [edge.to(patch_features.device) for edge in self.create_edges(topk_indices, self.patch_radius, height, width)] # [batch, 2, n]
+        # tt = time.time()
+        edge_index = [edge.to(patch_features.device) for edge in self.create_edges(topk_indices_1, self.patch_radius, height, width)] # [batch, 2, n]
         # print("create_edges time: ", time.time()-tt)
-        tt = time.time()
+        # tt = time.time()
         for i in range(batch_size):
-            node_features = patch_features[i]  # [num_queries, feature_dim] >> [896, 128]
+            node_features = patch_features[i]  # [num_queries, feature_dim] >> [700, 128]
             node_features = F.relu(self.gat_conv1(node_features, edge_index[i]))
-            node_features = F.relu(self.gat_conv2(node_features, edge_index[i]))[topk_indices[i]]
+            node_features = F.relu(self.gat_conv2(node_features, edge_index[i]))[topk_indices_1[i]]
+            # node_features = F.relu(self.gat_conv3(node_features, edge_index[i]))[topk_indices_1[i]]
             out_list.append(node_features)
         gat_output = torch.stack(out_list, dim=0)  # [batch_size, topk, feature_dim]
+
+        patch_scores_2 = torch.norm(gat_output, dim=2)  # [batch, num_patches]
+        topk_indices_2 = torch.topk(patch_scores_2, self.top_k_list[1], dim=1).indices  # [batch, top_k] >> [13, 300]
+        
+        gat_output = gat_output[torch.arange(batch_size)[:, None], topk_indices_2]
         gat_output = gat_output.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim, topk, 1]
+        # print("gat_output size: ", gat_output.size())
         # print("gat time: ", time.time()-tt)
 
         # Reshape GAT output for NetVLAD
-        tt = time.time()
+        # tt = time.time()
         gat_output = F.normalize(gat_output, dim=1)
         vlad_output = self.net_vlad(gat_output)
         # print("netvlad time: ", time.time()-tt)
