@@ -112,7 +112,7 @@ class Evaluator:
             if test_seq_forced is not None:
                 self.args.kitti_data_split['test'][0] = test_seq_forced
             self.sequence = f"{self.args.kitti_data_split['test'][0]:02d}" # for trained
-            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline or 'GAT' in self.args.pipeline:
                 self.args.dataset = 'KittiDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'KittiDataset'
@@ -121,7 +121,7 @@ class Evaluator:
             if self.test_for_val_set:
                 self.args.gm_data_split['test'] = self.args.gm_data_split['val']
             self.sequence = f"{self.args.gm_data_split['test'][0]:02d}"
-            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline or 'GAT' in self.args.pipeline:
                 self.args.dataset = 'GMDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'GMDataset'
@@ -133,7 +133,7 @@ class Evaluator:
             if test_seq_forced is not None:
                 self.args.nclt_data_split['test'][0] = test_seq_forced
                 self.sequence = self.args.nclt_data_split['test'][0]
-            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline:
+            if "Overlap" in self.args.pipeline or "CVT" in self.args.pipeline or 'GAT' in self.args.pipeline:
                 self.args.dataset = 'NCLTDepthImageDataset'
             elif "LOGG3D" in self.args.pipeline: # >> 확인 필요
                 self.args.dataset = 'NCLTSparseTupleDataset'
@@ -205,7 +205,7 @@ class Evaluator:
                 global_descriptor = np.reshape(global_descriptor, (1, -1))
                 descriptors_list.append(global_descriptor[0])
 
-            elif 'Overlap' in self.args.pipeline.split('_')[0]:
+            elif 'Overlap' in self.args.pipeline.split('_')[0] or 'GAT' in self.args.pipeline:
                 input_t = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device=self.device)
                 if input_t.ndim == 3:
                     input_t = input_t.unsqueeze(0)[:, 0, :, :].unsqueeze(1)

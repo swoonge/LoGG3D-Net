@@ -45,7 +45,7 @@ def main(cfg):
                                     )
 
     # 학습률을 증가시키며 100번의 iteration 동안 손실 변화 확인
-    lr_finder.range_test(finder_loader, end_lr=1e-2, num_iter=200) # 100
+    lr_finder.range_test(finder_loader, end_lr=1e-2, num_iter=1000) # 100
 
     # 학습률 제안 (손실이 가장 크게 감소한 지점을 기준으로 추정)
     best_loss = lr_finder.best_loss

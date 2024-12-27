@@ -34,7 +34,7 @@ def __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=
             results_dict = {}
             checkpoint_path = os.path.join('../checkpoints', model_path, checkpoint_name)
             if multi_ch is None:
-                evaluator = Evaluator(checkpoint_path, test_dataset_forced=None, test_seq_forced=None, test_for_val_set=test_for_val_set) # '2012-06-15'
+                evaluator = Evaluator(checkpoint_path, test_dataset_forced='NCLT', test_seq_forced='2012-06-15', test_for_val_set=test_for_val_set) # '2012-06-15'
             else:
                 evaluator = Evaluator_diff_ch(checkpoint_path, test_dataset_forced=None, test_seq_forced=None, test_for_val_set=test_for_val_set, multi_ch=multi_ch)
             matching_results, metrics_list = evaluator.run()
@@ -64,8 +64,8 @@ if __name__ == '__main__':
         # ['LoGG3D/kitti_10cm_loo', ['3n24h_Kitti_v10_q29_10s0.pth']],
         # ['LOGG3D/2024-11-22_11-00-00_LOGG3D_default_kitti05', ['epoch_30.pth']],
         # ['LoGG3D/kitti_10cm_loo', ['3n24h_Kitti_v10_q29_10s8.pth']],
-        ['LOGG3D/2024-12-19_18-00-54_LOGG3D_gm02', ['epoch_30.pth', 'epoch_best_41.pth']],
-        ['LOGG3D/2024-12-19_18-02-15_LOGG3D_gm03', ['epoch_30.pth', 'epoch_best_41.pth']],
+        # ['LOGG3D/2024-12-19_18-00-54_LOGG3D_gm02', ['epoch_30.pth', 'epoch_best_41.pth']],
+        # ['LOGG3D/2024-12-19_18-02-15_LOGG3D_gm03', ['epoch_30.pth', 'epoch_best_41.pth']],
         # ['LOGG3D/2024-11-25_11-00-00_LOGG3D_default_nclt', ['epoch_best_42.pth']],
         # ['LOGG3D/2024-11-25_11-00-00_LOGG3D_default_nclt', ['epoch_best_42.pth']],
 
@@ -119,8 +119,16 @@ if __name__ == '__main__':
         # ['OverlapGATNet/2024-12-09_21-42-47_OTGATNet_cnn_kitti00', ['epoch_best_37.pth']],
         # ['OverlapGATNet/2024-12-09_21-43-03_OTGATNet_cnn_kitti05', ['epoch_46.pth']],
         # ['OverlapGATNet/2024-12-09_21-43-19_OTGATNet_cnn_kitti08', ['epoch_29.pth']],
+
+        # ['OverlapGATNet/2024-12-24_21-12-34_OverlapGATNet_final_kitti08', ['epoch_59.pth']],
+        # ['OverlapGATNet/2024-12-24_21-53-33_OverlapGATNet_final2_kitti08', ['epoch_32.pth']],
+        # ['OverlapGATNet/2024-12-24_21-55-41_OverlapGATNet_final3_kitti08', ['epoch_best_45.pth']],
+
+        ['GATNet/2024-12-26_21-28-00_GATNet_DeepSet_kitti08', ['epoch_59.pth']],
+        ['GATNet/2024-12-26_21-27-12_GATNet_NetVLAD_kitti08', ['epoch_59.pth']],
+        ['GATNet/2024-12-26_21-27-35_GATNet_SelfAttention_kitti08', ['epoch_59.pth']],
     ]
 
-    __main__(test_models_list, test_all=True, test_for_val_set=True)
-    # __main__(test_models_list, test_all=False, test_for_val_set=False)
+    # __main__(test_models_list, test_all=True, test_for_val_set=True)
+    __main__(test_models_list, test_all=False, test_for_val_set=False)
     # __main__(test_models_list, test_all=False, test_for_val_set=False, multi_ch=[64, 16])

@@ -50,6 +50,8 @@ def main():
         cfg.dataset = 'KittiDepthImageDataset'
     if "kpfcnn" in cfg.pipeline:
         cfg.dataset = 'KittiDepthImageDataset'
+    if cfg.pipeline == 'GATNet':
+        cfg.dataset = 'KittiDepthImageDataset'
     
     loader = make_data_loader(cfg,
                                 cfg.test_phase,
@@ -74,11 +76,16 @@ def main():
                 data = batch[0].to(device)
                 processing_timer.tic()
                 output = model(data)
-            elif "Overlap" in cfg.pipeline or "CVT" in cfg.pipeline or "kpfcnn" in cfg.pipeline:
+            elif "Overlap" in cfg.pipeline or "kpfcnn" in cfg.pipeline or cfg.pipeline == 'GATNet':
                 data = torch.tensor(batch[0][0])      
                 data = data.type(torch.FloatTensor).unsqueeze(0).to(device) if 'CVT' in cfg.pipeline else data.unsqueeze(0).unsqueeze(0).to(device)
                 processing_timer.tic()
                 output = model(data) if 'GAT' in cfg.pipeline else model(data)
+            elif "CVT" in cfg.pipeline:
+                data = torch.tensor(batch[0][0]).type(torch.FloatTensor).to(device)
+                data = data.unsqueeze(0)
+                processing_timer.tic()
+                output = model(data)
             processing_timer.toc()
         # times_np = np.array(model.times)
         # print("average time: ", np.mean(times_np))

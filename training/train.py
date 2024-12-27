@@ -133,7 +133,7 @@ def main():
                 running_scene_loss += scene_loss.item()
                 loss = scene_loss
             
-            elif 'Overlap' in cfg.pipeline.split('_')[0]:
+            elif 'Overlap' in cfg.pipeline.split('_')[0] or cfg.pipeline == 'GATNet':
                 if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                     print("Batch size is not 6")
                     continue
@@ -219,7 +219,7 @@ def main():
                     running_scene_loss += scene_loss.item()
                     loss = scene_loss
 
-                elif 'Overlap' in cfg.pipeline.split('_')[0]:
+                elif 'Overlap' in cfg.pipeline.split('_')[0] or cfg.pipeline == 'GATNet':
                     if cfg.train_loss_function == 'quadruplet' and not batch.shape[0] == 6:
                         print("Batch size is not 6")
                         continue

@@ -13,7 +13,7 @@ def str2bool(v):
 # Set default values from environment variables
 # export PIPELINE='OverlapTransformer'
 # unset PIPELINE
-pipeline_default = os.getenv('PIPELINE', 'OverlapGATNet')
+pipeline_default = os.getenv('PIPELINE', 'GATNet')
                                         # LOGG3D
                                         # OverlapTransformer
                                         # OverlapNetTransformer
@@ -25,6 +25,7 @@ pipeline_default = os.getenv('PIPELINE', 'OverlapGATNet')
                                         # OverlapGATv3
                                         # OverlapViT
                                         # OverlapGATNet
+                                        # GATNet
 dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiPointSparseTupleDataset(LoGG3D)
                                       # KittirtpCoordinateTupleDataset(LOGG3D_kpfcnn)
@@ -33,7 +34,7 @@ dataset_default = os.getenv('DATASET', 'KittiDepthImageTupleDataset')
                                       # KittiDepthImageTupleDataset(ot)
                                       # GMDepthImageTupleDataset
                                       # NCLTDepthImageTupleDataset
-experiment_name_default = os.getenv('EXPERIMENT_NAME', 'LOGG3D_gm03')
+experiment_name_default = os.getenv('EXPERIMENT_NAME', 'GATNet_NetVLAD3_kitti08')
 
 ### Training ###
 trainer_arg = add_argument_group('Train')
@@ -51,14 +52,15 @@ overlap_gat_net_arg = add_argument_group('OverlapGATNet')
 overlap_gat_net_arg.add_argument('--feature_extractor_backbone', type=str, default='CNN') # CNN, DACNN, ViT, PatchCNNViT
 overlap_gat_net_arg.add_argument('--cnn_channels', type=list, default=[32, 64, 128, 128]) # 256, 512
 overlap_gat_net_arg.add_argument('--cnn_kernel_sizes', type=list, default=[5, 3, 3, 3]) # 3, 5
-overlap_gat_net_arg.add_argument('--cnn_strides', type=list, default=[(1,2), 2, 2, 1]) # 2, 1
+overlap_gat_net_arg.add_argument('--cnn_strides', type=list, default=[(2,2), 2, 2, 1]) # 2, 1
 overlap_gat_net_arg.add_argument('--cnn_norm_layer', type=str, default='gn') # gn, bn
-overlap_gat_net_arg.add_argument('--cnn_output_shape', type=tuple, default=(16, 113)) # (16, 225) (8, 112)
+overlap_gat_net_arg.add_argument('--cnn_output_shape', type=tuple, default=(16, 225)) # (16, 225) (8, 113)
 overlap_gat_net_arg.add_argument('--PatchCNNViT_patch_size', type=tuple, default=(4, 4))
 overlap_gat_net_arg.add_argument('--PatchCNNViT_embed_dim', type=int, default=128) # 2, 3, 4
 overlap_gat_net_arg.add_argument('--gat_channels', type=int, default=[128, 256]) # 256, 512
-overlap_gat_net_arg.add_argument('--topk_list', type=list, default=[1000, 500]) # [2000, 1000] [600, 300]
-overlap_gat_net_arg.add_argument('--patch_radius', type=int, default=7) # 7, 9
+overlap_gat_net_arg.add_argument('--topk_list', type=list, default=[2000, 2000]) # [2000, 1000] [600, 300]
+overlap_gat_net_arg.add_argument('--patch_radius', type=int, default=5) # 7, 9
+overlap_gat_net_arg.add_argument('--pooling_method', type=str, default='NetVLAD') # Mean, Max, Attention, DeepSet, SelfAttention, NetVLAD
 
 # DRaGNet
 drag_net_arg = add_argument_group('DRaGNet')
@@ -67,7 +69,7 @@ drag_net_arg = add_argument_group('DRaGNet')
 loss_arg = add_argument_group('Loss')
 # Contrastive
 loss_arg.add_argument('--train_loss_function', type=str, default='quadruplet') # quadruplet, triplet
-loss_arg.add_argument('--lazy_loss', type=str2bool, default=True)
+loss_arg.add_argument('--lazy_loss', type=str2bool, default=False)
 loss_arg.add_argument('--ignore_zero_loss', type=str2bool, default=False)
 loss_arg.add_argument('--positives_per_query', type=int, default=2) # 2
 loss_arg.add_argument('--negatives_per_query', type=int, default=2) # 2-18
@@ -85,8 +87,8 @@ loss_arg.add_argument('--scene_loss_weight', type=float, default=1.0) # 0.1
 ### Optimizer arguments ###
 opt_arg = add_argument_group('Optimizer')
 opt_arg.add_argument('--optimizer', type=str, default='adam')  # 'sgd','adam'
-opt_arg.add_argument('--max_epoch', type=int, default=60)  # 20
-opt_arg.add_argument('--base_learning_rate', type=float, default=5e-5) # LoGG3D: 1e-3, OT: 5e-6, GAT: 5e-5
+opt_arg.add_argument('--max_epoch', type=int, default=100)  # 20
+opt_arg.add_argument('--base_learning_rate', type=float, default=1e-5) # LoGG3D: 1e-3, OT: 5e-6, GAT: 5e-5
 opt_arg.add_argument('--momentum', type=float, default=0.8)  # 0.9
 opt_arg.add_argument('--scheduler', type=str, default='step2') 
                                                     #cosine #multistep(LoGG3D) #step(ot),. step2, ReduceLROnPlateau
@@ -156,7 +158,7 @@ data_arg.add_argument('--train_pickles', type=dict, default={'new_dataset': "/pa
 data_arg.add_argument('--gp_vals', type=dict, default={'apollo': 1.6, 'kitti':1.5, 'mulran':0.9}) # for general
 data_arg.add_argument('--val_phase', type=str, default="val")
 data_arg.add_argument('--test_phase', type=str, default="test")
-data_arg.add_argument('--use_random_rotation', type=str2bool, default=False)
+data_arg.add_argument('--use_random_rotation', type=str2bool, default=True)
 data_arg.add_argument('--rotation_range', type=float, default=360)
 data_arg.add_argument('--use_random_occlusion', type=str2bool, default=False)
 data_arg.add_argument('--occlusion_angle', type=float, default=30)

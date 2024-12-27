@@ -24,7 +24,7 @@ class KittiDepthImageDataset(PointCloudDataset):
         else:
             self.target_channel = 64
 
-        if 'Overlap' in config.pipeline or 'kpfcnn' in config.pipeline:
+        if 'Overlap' in config.pipeline or 'kpfcnn' in config.pipeline or 'GATNet' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'

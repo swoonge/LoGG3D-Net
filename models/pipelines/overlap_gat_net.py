@@ -5,6 +5,7 @@ p = os.path.dirname(os.path.dirname((os.path.abspath(__file__))))
 if p not in sys.path:
     sys.path.append(p)
 sys.path.append('../tools/')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 import torch
 import torch.nn as nn
 
@@ -17,6 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.decomposition import PCA
+from models.aggregators.SOP import *
 
 class PatchEmbedding(nn.Module):
     """Divide image into patches and embed them."""
@@ -173,7 +175,6 @@ class CNNPatchEmbedding(nn.Module):
         return x
 
     
-
 class PatchCNNVisionTransformer(nn.Module):
     """Vision Transformer for non-square images."""
     def __init__(self, in_channels=1, patch_size=(8, 8), embed_dim=128, 
@@ -262,6 +263,7 @@ class PyramidCNN(nn.Module):
     def forward(self, x):
         """
         Args:
+
             x: Input image of shape [batch, 1, 64, 900].
         Returns:
             patch_features: Features of shape [batch, num_patches, feature_dim].
@@ -281,7 +283,7 @@ class GraphNetwork(nn.Module):
         self.gat_layers = nn.ModuleList()
 
         for layer in range(self.num_layers - 1):
-            self.gat_layers.append(GATv2Conv(gat_channels[layer], gat_channels[layer + 1], residual=True, dropout=0.1))
+            self.gat_layers.append(GATv2Conv(gat_channels[layer], gat_channels[layer + 1], heads=1, residual=True, dropout=0.1))
 
     def forward(self, x, edge_index):
         for gat in self.gat_layers:
@@ -289,11 +291,13 @@ class GraphNetwork(nn.Module):
         return x
 
 
-class OverlapGATNet(nn.Module):
+class GATNet(nn.Module):
     def __init__(self, config, in_channels=1):
-        super(OverlapGATNet, self).__init__()
+        super(GATNet, self).__init__()
         self.top_k_list = config.topk_list
         self.patch_radius = config.patch_radius
+        self.feature_h, self.feature_w = config.cnn_output_shape  # >> 16, 225
+        self.pooling_method = config.pooling_method
         self.config = config
 
         if config.feature_extractor_backbone == "CNN":
@@ -305,94 +309,177 @@ class OverlapGATNet(nn.Module):
                                                                ff_dim=256, dropout=0.1)
 
         self.gat_layers = GraphNetwork(config.gat_channels)
-        self.net_vlad = NetVLADLoupe(feature_size=config.gat_channels[-1], max_samples=self.top_k_list[1], cluster_size=64,
-                                     output_dim=256, gating=True, add_batch_norm=False,
-                                     is_training=True)
 
-    def create_edges(self, topk_indices, patch_radius, height, width):
+        if self.pooling_method == 'NetVLAD':
+            self.net_vlad = NetVLADLoupe(feature_size=config.gat_channels[-1], max_samples=self.top_k_list[1], cluster_size=64,
+                                         output_dim=256, gating=True, add_batch_norm=False,
+                                         is_training=True)
+        elif self.pooling_method == 'Attention':
+            self.attn_linear = nn.Linear(config.gat_channels[-1], 1)  # For attention pooling
+        elif self.pooling_method == 'DeepSet':
+            self.mlp = nn.Sequential(
+                nn.Linear(config.gat_channels[-1], 256),
+                nn.ReLU(),
+                nn.Linear(256, 256)
+            )
+        elif self.pooling_method == 'SelfAttention':
+            self.query = nn.Linear(config.gat_channels[-1], config.gat_channels[-1])
+            self.key = nn.Linear(config.gat_channels[-1], config.gat_channels[-1])
+            self.value = nn.Linear(config.gat_channels[-1], config.gat_channels[-1])
+        elif self.pooling_method == 'SOP':
+            self.sop = SOP(signed_sqrt=False, do_fc=False, input_dim=256, is_tuple=False)
+
+    def create_edges(self, topk_indices, patch_radius):
         if topk_indices.dim() == 1:
             topk_indices = topk_indices.unsqueeze(0)  # [1, top_k]
         
-        # Top-K 인덱스를 2D 좌표로 변환
-        y_coords = topk_indices // width  # [batch, top_k]
-        x_coords = topk_indices % width   # [batch, top_k]
-
-        # Top-K 패치 좌표 [batch, top_k, 2]
+        # 2D 좌표 변환 [h, w]
+        y_coords = topk_indices // self.feature_w  # [batch, top_k] 
+        x_coords = topk_indices % self.feature_w   # [batch, top_k]
+        
+        # y, x 좌표 스택 [batch, top_k, 2]
         coords = torch.stack((y_coords, x_coords), dim=2).float()
 
-        # 패치 간 거리 계산 (유클리드 거리)
-        distances = torch.cdist(coords, coords, p=2)  # [batch, top_k, top_k]
+        # 브로드캐스팅 방식으로 거리 계산 (불필요한 축 제거)
+        delta = coords[:, :, None] - coords[:, None, :]  # [batch, top_k, top_k, 2]
+        
+        y_dist = delta[..., 0].abs()  # y 방향 거리
+        
+        # x 방향(가로)에서 순환성을 고려한 거리 계산
+        x_dist = delta[..., 1].abs()
+        x_dist = torch.minimum(x_dist, self.feature_w - x_dist)  # 순환 거리 계산
+        
+        # 유클리드 거리 계산
+        distances = torch.sqrt((y_dist)**2 + (x_dist)**2)  # [batch, top_k, top_k]
 
-        # 거리 내에 있는 패치 (patch_radius 이하)
-        within_radius = distances <= patch_radius  # [batch, top_k, top_k]
+        # 일정 거리 내의 패치 연결
+        within_radius = distances <= patch_radius
 
-        # 자기 자신 엣지 제거 (거리가 0인 경우)
+        # 자기 자신 엣지 제거
         no_self_loop = torch.eye(topk_indices.size(1), device=topk_indices.device).bool()
-        within_radius &= ~no_self_loop.unsqueeze(0)  # [batch, top_k, top_k]
+        within_radius &= ~no_self_loop.unsqueeze(0)
 
         # 엣지 인덱스 생성
-        src = topk_indices.repeat_interleave(topk_indices.size(1))  # [batch, top_k * top_k]
-        dst = topk_indices.repeat(1, topk_indices.size(1)).flatten()  # [batch, top_k * top_k]
+        src = topk_indices.repeat_interleave(topk_indices.size(1))
+        dst = topk_indices.repeat(1, topk_indices.size(1)).flatten()
 
-        # 유효한 엣지만 필터링 (자기 자신 제외)
+        # 유효한 엣지만 필터링
         valid_edges = within_radius.flatten()
         src = src[valid_edges]
         dst = dst[valid_edges]
 
-        # [2, num_edges] 형태로 반환
         return torch.stack((src, dst), dim=0)
+    
+    def pooling(self, node_features):
+        if self.pooling_method == 'Mean':
+            pooled = torch.mean(node_features, dim=1)  # Global Average Pooling (GAP)
+            return F.normalize(pooled, dim=1, eps=1e-8)
+        elif self.pooling_method == 'Max':
+            pooled = torch.max(node_features, dim=1)[0]  # Global Max Pooling (GMP)
+            return F.normalize(pooled, dim=1, eps=1e-8)
+        elif self.pooling_method == 'Attention':
+            attn_weights = F.softmax(self.attn_linear(node_features), dim=1)  # [batch, num_nodes, 1]
+            pooled = torch.sum(attn_weights * node_features, dim=1)  # Weighted sum
+            return F.normalize(pooled, dim=1, eps=1e-8)
+        elif self.pooling_method == 'DeepSet':
+            pooled = self.mlp(torch.sum(node_features, dim=1))
+            return F.normalize(pooled, dim=1, eps=1e-8)  # MLP 이후 정규화
+        elif self.pooling_method == 'SelfAttention':
+            q = self.query(node_features)  # [batch, num_nodes, feature_dim]
+            k = self.key(node_features)
+            v = self.value(node_features)
+            attn_scores = F.softmax(torch.bmm(q, k.transpose(1, 2)) / (q.size(-1) ** 0.5), dim=-1)
+            global_descriptor = torch.bmm(attn_scores, v)
+            pooled = torch.mean(global_descriptor, dim=1)
+            return pooled  # SelfAttention은 정규화 없음
+        elif self.pooling_method == 'NetVLAD':
+            return F.normalize(self.net_vlad(node_features.permute(0, 2, 1).unsqueeze(3)), dim=1, eps=1e-8)
+        elif self.pooling_method == 'SOP':
+            return self.sop(node_features)
+        else:
+            raise ValueError(f"Unknown pooling method: {self.pooling_method}")
 
-    def visualize_edges(self, topk_indices, edge_index, height, width, patch_h, patch_w, feature):
-        plt.figure(figsize=(10, 10))
-        all_coords = torch.arange(patch_h * patch_w).numpy()
-        all_y = (all_coords // width)
-        all_x = (all_coords % width)
-        plt.scatter(all_x, all_y, color='gray', label='All Nodes')
+    def visualize_edges(self, topk_indices, edge_index, feature, x):
+        from torchvision.transforms.functional import resize
+        from sklearn.decomposition import PCA
+        
+        x_resized = resize(x, [self.feature_h, self.feature_w]).squeeze().cpu().numpy()  # [h, w]
+        topk_indices = topk_indices.cpu().numpy()  # [top_k]
 
-        # print("topk_indices", topk_indices, " | edge_index", edge_index.size())
-        y_coords = (topk_indices // width).cpu().numpy()
-        x_coords = (topk_indices % width).cpu().numpy()
-        plt.scatter(x_coords, y_coords, color='blue', label='Top-K Nodes')
+        # 창 0: 원본 이미지 시각화
+        plt.figure(figsize=(80, 5))
+        plt.imshow(resize(x, [self.feature_h*4, self.feature_w*4]).squeeze().cpu().numpy(), cmap='gray')
+        plt.title('Original Image')
+        plt.colorbar(label='Pixel Intensity')
+        plt.show(block=False)  # [h, w]
+
+        # 창 1: x_resized의 픽셀 값 사용
+        plt.figure(figsize=(80, 5))
+        y_coords = np.arange(self.feature_h * self.feature_w) // self.feature_w
+        x_coords = np.arange(self.feature_h * self.feature_w) % self.feature_w
+        
+        # topk_indices 점에 흑백 픽셀값 매핑
+        colors = x_resized.flatten()
+        plt.scatter(x_coords, y_coords, c=colors, cmap='gray', s=100)
+        plt.scatter(x_coords[topk_indices], y_coords[topk_indices], facecolors='none', edgecolors='r', s=150, linewidth=1.5)
 
         for i in range(edge_index.size(1)):
             src = edge_index[0, i].item()
             dst = edge_index[1, i].item()
-            src_y, src_x = src // width, src % width
-            dst_y, dst_x = dst // width, dst % width
-            plt.plot([src_x, dst_x], [src_y, dst_y], color='green', alpha=0.5)
-        
+            src_y, src_x = src // self.feature_w, src % self.feature_w
+            dst_y, dst_x = dst // self.feature_w, dst % self.feature_w
+            plt.plot([src_x, dst_x], [src_y, dst_y], color='green', linewidth=0.2, alpha=0.2)
+
         plt.gca().invert_yaxis()
+        plt.title('Top-K Nodes with Grayscale Values')
+        plt.colorbar(label='Pixel Intensity')
         plt.legend()
-        plt.title('Visualization of Edges and Top-K Nodes')
+        plt.show(block=False)
+
+        # 창 2: feature를 PCA로 축소해 RGB 색상 매핑
+        feature = feature.detach().cpu().numpy()  # [num_patches, feature_dim]
+        pca = PCA(n_components=3)
+        feature_pca = pca.fit_transform(feature)
+        feature_pca = np.clip(feature_pca, 0, 1)  # RGB 값으로 사용하기 위해 0~1로 클리핑
+
+        plt.figure(figsize=(80, 5))
+        
+        # PCA 색상을 topk_indices에 매핑
+        colors = feature_pca
+        plt.scatter(x_coords, y_coords, c=colors, label='Top-K Nodes (PCA Colors)', s=100)
+
+        for i in range(edge_index.size(1)):
+            src = edge_index[0, i].item()
+            dst = edge_index[1, i].item()
+            src_y, src_x = src // self.feature_w, src % self.feature_w
+            dst_y, dst_x = dst // self.feature_w, dst % self.feature_w
+            plt.plot([src_x, dst_x], [src_y, dst_y], color='green', linewidth=0.5, alpha=0.3)
+
+        plt.gca().invert_yaxis()
+        plt.title('Top-K Nodes with PCA-based RGB Colors')
+        plt.legend()
         plt.show()
 
     def forward(self, x):
         # Patch-wise feature extraction
-        patch_features = self.feature_extractor(x)  # [batch, feature_dim, h, w] >> [batch, 128, 16, 225]
+        cnn_features = self.feature_extractor(x)  # [batch, feature_dim, h, w] >> [batch, 128, 16, 225]
         # Reshape into patch-wise features
-        batch_size, channels, _, _ = patch_features.size() 
-        patch_features = patch_features.view(batch_size, channels, -1).permute(0, 2, 1)  # [batch, num_patches, feature_dim]
+        batch_size, dim, _, _ = cnn_features.size() 
+        patch_features = cnn_features.view(batch_size, dim, -1).permute(0, 2, 1)  # [batch, num_patches, feature_dim] [6, 904, 128]
         # print("patch_features", patch_features.size())
 
         # Top-K patch selection
-        patch_scores_1 = torch.norm(patch_features, dim=2)  # [batch, num_patches] >> [6, 3600]
-        topk_indices_1 = torch.topk(patch_scores_1, self.top_k_list[0], dim=1).indices  # [batch, top_k] >> [6, 1000]
+        patch_scores_1 = torch.norm(patch_features, dim=2)  # [batch, num_patches] >> [6, 904]
+        topk_indices_1 = torch.topk(patch_scores_1, self.top_k_list[0], dim=1).indices  # [batch, top_k] >> [6, top_k]
         # print("patch_scores_1", patch_scores_1.size(), " | topk_indices_1", topk_indices_1.size())
 
         # Create edges for GAT
-        patch_h, patch_w = self.config.cnn_output_shape  # >> 16, 225
-        height = x.size(2) // patch_h # >> 4
-        width = x.size(3) // patch_w # >> 4
-        # print("patch_h", patch_h, " | patch_w", patch_w, " | batch_size", batch_size)
-        # print("height", height, " | width", width)
-
         out_list = []
         edge_index_list = [
-            self.create_edges(topk_indices_1[i], self.patch_radius, height, width).to(patch_features.device)
+            self.create_edges(topk_indices_1[i], self.patch_radius).to(patch_features.device)
             for i in range(batch_size)
         ]
         # print("edge_index", edge_index[0].size())
-        self.visualize_edges(topk_indices_1[0], edge_index_list[0], height, width, patch_h, patch_w, patch_features[0])
 
         # GAT layer
         for i in range(batch_size):
@@ -401,19 +488,19 @@ class OverlapGATNet(nn.Module):
         gat_output = torch.stack(out_list, dim=0)  # [batch_size, topk, feature_dim] >> [6, 1000, 256]
         # print("gat_output", gat_output.size()) 
 
-        patch_scores_2 = torch.norm(gat_output, dim=2)  # [batch, num_patches]
-        topk_indices_2 = torch.topk(patch_scores_2, self.top_k_list[1], dim=1).indices  # [batch, top_k] >> [13, 300]
-        # print("patch_scores_2", patch_scores_2.size(), " | topk_indices_2", topk_indices_2.size())
+        if self.top_k_list[0] != self.top_k_list[1]:
+            patch_scores_2 = torch.norm(gat_output, dim=2)  # [batch, num_patches]
+            topk_indices_2 = torch.topk(patch_scores_2, self.top_k_list[1], dim=1).indices  # [batch, top_k] >> [13, 300]
+            gat_output = gat_output[torch.arange(batch_size)[:, None], topk_indices_2]
+        # gat_output = gat_output.permute(0, 2, 1).unsqueeze(3) # [batch, feature_dim, topk, 1] >> [6, 256, 500, 1]
+
+        # self.visualize_edges(topk_indices_1[1], edge_index_list[1], patch_features[1], x[1])
         
-        gat_output = gat_output[torch.arange(batch_size)[:, None], topk_indices_2]
-        gat_output = F.normalize(gat_output.permute(0, 2, 1).unsqueeze(3), dim=1) # [batch, feature_dim, topk, 1] >> [6, 256, 500, 1]
-        # print("gat_output", gat_output.size())
+        # Apply selected pooling method
+        global_output = self.pooling(gat_output)  # [batch, feature_dim] or [batch, k*feature_dim]
+        # print("global_output", vlad_output.size())
 
-        # Reshape GAT output for NetVLAD
-        vlad_output = self.net_vlad(gat_output) # >> [6, 256]
-        # print("vlad_output", vlad_output.size())
-
-        return F.normalize(vlad_output, dim=1)
+        return global_output
 
 sys.path.append(os.path.join(os.path.dirname(os.path.join(os.path.dirname(os.path.join(os.path.dirname(__file__)))))))
 from config.config import get_config
@@ -438,7 +525,9 @@ def visualize_feature_maps(feature_map1, feature_map2):
 
 def test_overlap_gat_net():
     cfg = get_config()
-    model = OverlapGATNet(cfg).to("cuda")
+    model = GATNet(cfg).to("cuda")
+    # checkpoint = torch.load('/home/vision/Models/LoGG3D-Net/checkpoints/GATNet/2024-12-26_21-27-12_GATNet_NetVLAD_kitti08/epoch_59.pth')
+    # model.load_state_dict(checkpoint['model_state_dict'])
     train_loader = make_data_loader(cfg,
                                     cfg.train_phase,
                                     cfg.batch_size,

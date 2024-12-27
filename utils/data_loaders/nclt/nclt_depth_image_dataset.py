@@ -24,7 +24,7 @@ class NCLTDepthImageDataset(PointCloudDataset):
 
         self.root = root = config.nclt_dir
 
-        if 'Overlap' in config.pipeline:
+        if 'Overlap' in config.pipeline or 'GAT' in config.pipeline:
             self.image_folder = 'range_images'
         elif 'CVT' in config.pipeline:
             self.image_folder = 'ri_bev'
